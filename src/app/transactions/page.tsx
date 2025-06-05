@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { ListChecks, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { ListChecks, ArrowDownCircle, ArrowUpCircle, Edit3 } from 'lucide-react';
 import type { Transaction, TransactionDrugDetail } from '@/types';
 
 export default function TransactionsPage() {
@@ -27,6 +27,7 @@ export default function TransactionsPage() {
   );
 
   const renderDrugDetails = (drugDetails: TransactionDrugDetail[]) => {
+    if (!drugDetails || drugDetails.length === 0) return <span className="text-muted-foreground">N/A</span>;
     return (
       <ul className="list-disc list-inside space-y-1">
         {drugDetails.map(detail => (
@@ -38,6 +39,24 @@ export default function TransactionsPage() {
     );
   };
 
+  const renderUpdateDetails = (transaction: Transaction) => {
+    if (transaction.type !== 'update' || !transaction.updateDetails) return null;
+    const { drugName, previousName, newName, previousPrice, newPrice } = transaction.updateDetails;
+    const changes = [];
+    if (newName && previousName) changes.push(`Name: "${previousName}" -> "${newName}"`);
+    else if (newName) changes.push(`Name set to: "${newName}"`);
+    
+    if (newPrice !== undefined && previousPrice !== undefined) changes.push(`Price: ₹${previousPrice.toFixed(2)} -> ₹${newPrice.toFixed(2)}`);
+    else if (newPrice !== undefined) changes.push(`Price set to: ₹${newPrice.toFixed(2)}`);
+
+    return (
+      <div className="text-sm">
+        <p><strong>Drug:</strong> {drugName}</p>
+        {changes.map((change, idx) => <p key={idx}>{change}</p>)}
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       <Card className="shadow-xl">
@@ -46,7 +65,7 @@ export default function TransactionsPage() {
             <ListChecks className="h-6 w-6 text-primary" />
             Transaction Log
           </CardTitle>
-          <CardDescription>A record of all inventory movements.</CardDescription>
+          <CardDescription>A record of all inventory movements and updates.</CardDescription>
         </CardHeader>
         <CardContent>
           {sortedTransactions.length === 0 ? (
@@ -60,7 +79,7 @@ export default function TransactionsPage() {
                     <TableHead className="w-[180px]">Timestamp</TableHead>
                     <TableHead className="w-[120px]">Type</TableHead>
                     <TableHead>Details</TableHead>
-                    <TableHead>Drugs Involved</TableHead>
+                    <TableHead>Drugs Involved / Changes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -68,8 +87,13 @@ export default function TransactionsPage() {
                     <TableRow key={transaction.id}>
                       <TableCell>{format(new Date(transaction.timestamp), "PPpp")}</TableCell>
                       <TableCell>
-                        <Badge variant={transaction.type === 'dispense' ? 'destructive' : 'default'} className="capitalize flex items-center gap-1">
-                          {transaction.type === 'dispense' ? <ArrowDownCircle className="h-3 w-3" /> : <ArrowUpCircle className="h-3 w-3" />}
+                        <Badge 
+                          variant={transaction.type === 'dispense' ? 'destructive' : transaction.type === 'update' ? 'secondary' : 'default'} 
+                          className="capitalize flex items-center gap-1"
+                        >
+                          {transaction.type === 'dispense' && <ArrowDownCircle className="h-3 w-3" />}
+                          {transaction.type === 'restock' && <ArrowUpCircle className="h-3 w-3" />}
+                          {transaction.type === 'update' && <Edit3 className="h-3 w-3" />}
                           {transaction.type}
                         </Badge>
                       </TableCell>
@@ -85,8 +109,13 @@ export default function TransactionsPage() {
                         {transaction.type === 'restock' && transaction.source && (
                           <p><strong>Source:</strong> {transaction.source}</p>
                         )}
+                        {transaction.type === 'update' && transaction.notes && (
+                            <p className="text-sm">{transaction.notes}</p>
+                        )}
                       </TableCell>
-                      <TableCell>{renderDrugDetails(transaction.drugs)}</TableCell>
+                      <TableCell>
+                        {transaction.type === 'update' ? renderUpdateDetails(transaction) : renderDrugDetails(transaction.drugs)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

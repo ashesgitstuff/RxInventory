@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { Pill, LayoutGrid, MinusCircle, PackagePlus, Settings as SettingsIcon, ListChecks } from 'lucide-react';
+import { Pill, LayoutGrid, MinusCircle, PackagePlus, Settings as SettingsIcon, ListChecks, Edit } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ const navItems = [
   { href: '/dispense', label: 'Dispense Drugs', icon: MinusCircle },
   { href: '/restock', label: 'Restock', icon: PackagePlus },
   { href: '/', label: 'Dashboard', icon: LayoutGrid },
+  { href: '/manage-drugs', label: 'Manage Drugs', icon: Edit },
   { href: '/transactions', label: 'Transactions', icon: ListChecks },
   { href: '/settings', label: 'Settings', icon: SettingsIcon },
 ];

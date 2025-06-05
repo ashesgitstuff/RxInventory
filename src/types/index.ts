@@ -58,7 +58,7 @@ export interface TransactionDrugDetail {
 
 export interface Transaction {
   id: string;
-  type: 'dispense' | 'restock';
+  type: 'dispense' | 'restock' | 'update';
   timestamp: string; // ISO string for date
   patientName?: string;
   aadharLastFour?: string;
@@ -67,4 +67,17 @@ export interface Transaction {
   source?: string; // For restock
   drugs: TransactionDrugDetail[];
   notes?: string; // Optional field for any notes
+  updateDetails?: { // For 'update' type transactions
+    drugId: string;
+    drugName: string;
+    previousName?: string;
+    newName?: string;
+    previousPrice?: number;
+    newPrice?: number;
+  };
+}
+
+export interface EditDrugFormData {
+  name: string;
+  purchasePricePerStrip: number;
 }
