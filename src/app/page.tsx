@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useInventory } from '@/contexts/InventoryContext';
@@ -7,7 +8,7 @@ import Link from 'next/link';
 import { PlusCircle } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { drugs, lowStockThreshold } = useInventory();
+  const { drugs } = useInventory(); // Removed lowStockThreshold from here
 
   if (!drugs || drugs.length === 0) {
     return (
@@ -30,7 +31,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {drugs.map((drug) => (
-          <DrugStockCard key={drug.id} drug={drug} lowStockThreshold={lowStockThreshold} />
+          <DrugStockCard key={drug.id} drug={drug} /> 
         ))}
       </div>
       

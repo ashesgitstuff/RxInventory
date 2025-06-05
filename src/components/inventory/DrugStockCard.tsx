@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Drug } from '@/types';
@@ -8,12 +9,16 @@ import { cn } from '@/lib/utils';
 
 interface DrugStockCardProps {
   drug: Drug;
-  lowStockThreshold: number;
+  // lowStockThreshold prop is removed as it's now part of the drug object
 }
 
-export default function DrugStockCard({ drug, lowStockThreshold }: DrugStockCardProps) {
-  const isLowStock = drug.stock < lowStockThreshold;
-  const stockPercentage = Math.min((drug.stock / (lowStockThreshold * 2)) * 100, 100); // Cap at 100 for visual, e.g. threshold is 10, max bar at 20.
+export default function DrugStockCard({ drug }: DrugStockCardProps) {
+  const isLowStock = drug.stock < drug.lowStockThreshold;
+  // Cap at 100 for visual, e.g. threshold is 10, max bar at 20 (or twice the threshold).
+  // If threshold is 0, use stock directly up to a reasonable max like 50 for progress bar visualization.
+  const progressBarMax = drug.lowStockThreshold > 0 ? drug.lowStockThreshold * 2 : Math.max(20, drug.stock); // Avoid division by zero
+  const stockPercentage = progressBarMax > 0 ? Math.min((drug.stock / progressBarMax) * 100, 100) : (drug.stock > 0 ? 100 : 0) ;
+
 
   return (
     <Card className={cn("transition-all duration-300 shadow-lg hover:shadow-xl", isLowStock ? 'border-destructive bg-destructive/10' : 'border-border')}>
@@ -27,7 +32,7 @@ export default function DrugStockCard({ drug, lowStockThreshold }: DrugStockCard
       <CardContent>
         <div className="text-3xl font-bold text-foreground">{drug.stock} strips</div>
         <p className="text-xs text-muted-foreground">
-          {isLowStock ? `Stock is low (Threshold: ${lowStockThreshold})` : `Threshold: ${lowStockThreshold} strips`}
+          {isLowStock ? `Stock is low (Threshold: ${drug.lowStockThreshold})` : `Threshold: ${drug.lowStockThreshold} strips`}
         </p>
         <Progress 
           value={stockPercentage} 

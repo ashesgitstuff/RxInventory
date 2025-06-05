@@ -23,6 +23,7 @@ import { CheckCircle } from 'lucide-react';
 const editDrugFormSchema = z.object({
   name: z.string().min(2, { message: "Drug name must be at least 2 characters." }),
   purchasePricePerStrip: z.coerce.number().min(0, { message: "Price must be non-negative." }),
+  lowStockThreshold: z.coerce.number().int().min(0, { message: "Threshold must be zero or a positive number." }),
 });
 
 interface EditDrugFormProps {
@@ -40,11 +41,11 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
     defaultValues: {
       name: drug.name,
       purchasePricePerStrip: drug.purchasePricePerStrip,
+      lowStockThreshold: drug.lowStockThreshold,
     },
   });
 
   function onSubmit(data: EditDrugFormData) {
-    // Check for name uniqueness if name has changed
     if (data.name.toLowerCase() !== drug.name.toLowerCase()) {
       const existingDrugWithNewName = getDrugByName(data.name);
       if (existingDrugWithNewName && existingDrugWithNewName.id !== drug.id) {
@@ -98,6 +99,19 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
               <FormLabel>Purchase Price Per Strip (INR)</FormLabel>
               <FormControl>
                 <Input type="number" placeholder="e.g., 2.50" {...field} min="0" step="0.01" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="lowStockThreshold"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Low Stock Threshold (Strips)</FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="Enter threshold" {...field} min="0" />
               </FormControl>
               <FormMessage />
             </FormItem>

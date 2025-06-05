@@ -19,8 +19,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useInventory } from '@/contexts/InventoryContext';
-import type { RestockFormData, DrugRestockEntry, NewDrugDetails, Drug } from '@/types';
-import { DEFAULT_PURCHASE_PRICE } from '@/types';
+import type { RestockFormData, DrugRestockEntry, NewDrugDetails } from '@/types';
+import { DEFAULT_PURCHASE_PRICE, DEFAULT_DRUG_LOW_STOCK_THRESHOLD } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, PackagePlus, PlusCircle, Trash2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -28,6 +28,7 @@ import { Separator } from '@/components/ui/separator';
 const newDrugDetailsSchema = z.object({
   name: z.string().min(2, { message: "New drug name must be at least 2 characters." }),
   purchasePricePerStrip: z.coerce.number().min(0, { message: "Price must be non-negative." }),
+  lowStockThreshold: z.coerce.number().int().min(0, { message: "Threshold must be zero or positive." }),
 }).optional();
 
 const drugRestockEntrySchema = z.object({
@@ -36,11 +37,14 @@ const drugRestockEntrySchema = z.object({
   stripsAdded: z.coerce.number().int().positive({ message: "Strips must be a positive number." }),
 }).refine(data => {
     if (data.drugId === '--add-new--') {
-        return !!data.newDrugDetails && data.newDrugDetails.name.length >=2 && (data.newDrugDetails.purchasePricePerStrip !== undefined && data.newDrugDetails.purchasePricePerStrip >=0);
+        return !!data.newDrugDetails && 
+               data.newDrugDetails.name.length >=2 && 
+               (data.newDrugDetails.purchasePricePerStrip !== undefined && data.newDrugDetails.purchasePricePerStrip >=0) &&
+               (data.newDrugDetails.lowStockThreshold !== undefined && data.newDrugDetails.lowStockThreshold >=0);
     }
     return true;
 }, {
-    message: "New drug details (name and valid price) are required when 'Add New Drug' is selected.",
+    message: "New drug details (name, valid price, and valid threshold) are required when 'Add New Drug' is selected.",
     path: ["newDrugDetails"], 
 });
 
@@ -60,7 +64,15 @@ export default function RestockForm() {
     resolver: zodResolver(restockFormSchema),
     defaultValues: {
       source: '',
-      drugsToRestock: [{ drugId: '', stripsAdded: 10, newDrugDetails: { name: '', purchasePricePerStrip: DEFAULT_PURCHASE_PRICE } }],
+      drugsToRestock: [{ 
+        drugId: '', 
+        stripsAdded: 10, 
+        newDrugDetails: { 
+          name: '', 
+          purchasePricePerStrip: DEFAULT_PURCHASE_PRICE, 
+          lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD 
+        } 
+      }],
     },
   });
 
@@ -76,7 +88,7 @@ export default function RestockForm() {
 
   useEffect(() => {
     let currentGrandTotal = 0;
-    watchedDrugsToRestock.forEach((item, index) => {
+    watchedDrugsToRestock.forEach((item) => {
       const strips = Number(item.stripsAdded) || 0;
       let pricePerStrip = 0;
       if (item.drugId === '--add-new--') {
@@ -95,10 +107,10 @@ export default function RestockForm() {
     const isNew = value === '--add-new--';
     setFieldStates(prev => ({ ...prev, [index]: { isNewDrug: isNew } }));
     form.setValue(`drugsToRestock.${index}.newDrugDetails`, 
-        isNew ? { name: '', purchasePricePerStrip: DEFAULT_PURCHASE_PRICE } : undefined
+        isNew ? { name: '', purchasePricePerStrip: DEFAULT_PURCHASE_PRICE, lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD } : undefined
     );
     form.setValue(`drugsToRestock.${index}.drugId`, value);
-    form.trigger(`drugsToRestock.${index}.newDrugDetails`); // Trigger validation for conditional fields
+    form.trigger(`drugsToRestock.${index}.newDrugDetails`);
   };
 
 
@@ -127,7 +139,15 @@ export default function RestockForm() {
       });
       form.reset({
         source: '',
-        drugsToRestock: [{ drugId: '', stripsAdded: 10, newDrugDetails: { name: '', purchasePricePerStrip: DEFAULT_PURCHASE_PRICE } }],
+        drugsToRestock: [{ 
+            drugId: '', 
+            stripsAdded: 10, 
+            newDrugDetails: { 
+                name: '', 
+                purchasePricePerStrip: DEFAULT_PURCHASE_PRICE, 
+                lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD 
+            } 
+        }],
       });
       setFieldStates({}); 
       setGrandTotal(0);
@@ -303,8 +323,20 @@ export default function RestockForm() {
                         </FormItem>
                       )}
                     />
-                    {/* Purchase price for new drug is now in the main grid, this is a bit redundant but harmless */}
-                     <FormDescription className="text-xs">Ensure name and cost per strip (above) are filled for new drugs.</FormDescription>
+                     <FormField
+                        control={form.control}
+                        name={`drugsToRestock.${index}.newDrugDetails.lowStockThreshold`}
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Low Stock Threshold (Strips)</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="e.g., 5" {...field} min="0" />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                    <FormDescription className="text-xs">Ensure name, cost per strip (above), and threshold are filled for new drugs.</FormDescription>
                   </div>
                 )}
                  <div className="text-right font-semibold mt-2">
@@ -315,7 +347,15 @@ export default function RestockForm() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => append({ drugId: '', stripsAdded: 10, newDrugDetails: { name: '', purchasePricePerStrip: DEFAULT_PURCHASE_PRICE } })}
+              onClick={() => append({ 
+                  drugId: '', 
+                  stripsAdded: 10, 
+                  newDrugDetails: { 
+                      name: '', 
+                      purchasePricePerStrip: DEFAULT_PURCHASE_PRICE, 
+                      lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD 
+                    } 
+                })}
               className="w-full flex items-center gap-2"
             >
               <PlusCircle className="h-4 w-4" /> Add Another Drug Item

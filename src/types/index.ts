@@ -4,16 +4,17 @@ export interface Drug {
   name: string;
   purchasePricePerStrip: number;
   stock: number; // in strips
+  lowStockThreshold: number; // Individual threshold for this drug
 }
 
 export const INITIAL_DRUGS: Drug[] = [
-  { id: 'metformin-500mg', name: 'Metformin 500mg', purchasePricePerStrip: 5, stock: 50 },
-  { id: 'amlong-5mg', name: 'Amlong 5mg', purchasePricePerStrip: 10, stock: 50 },
-  { id: 'telma-40mg', name: 'Telma 40mg', purchasePricePerStrip: 15, stock: 50 },
+  { id: 'metformin-500mg', name: 'Metformin 500mg', purchasePricePerStrip: 5, stock: 50, lowStockThreshold: 10 },
+  { id: 'amlong-5mg', name: 'Amlong 5mg', purchasePricePerStrip: 10, stock: 50, lowStockThreshold: 10 },
+  { id: 'telma-40mg', name: 'Telma 40mg', purchasePricePerStrip: 15, stock: 50, lowStockThreshold: 15 },
 ];
 
-export const DEFAULT_LOW_STOCK_THRESHOLD = 10;
 export const DEFAULT_PURCHASE_PRICE = 1; // Default purchase price for a new drug strip
+export const DEFAULT_DRUG_LOW_STOCK_THRESHOLD = 5; // Default low stock threshold for a new drug
 
 export interface DrugDispenseEntry {
   drugId: string;
@@ -31,6 +32,7 @@ export interface DispenseFormData {
 export interface NewDrugDetails {
   name: string;
   purchasePricePerStrip: number;
+  lowStockThreshold: number;
 }
 
 export interface DrugRestockEntry {
@@ -44,9 +46,10 @@ export interface RestockFormData {
   drugsToRestock: DrugRestockEntry[];
 }
 
-export interface SettingsFormData {
-  lowStockThreshold: number;
-}
+// SettingsFormData is no longer needed as threshold is per-drug
+// export interface SettingsFormData {
+//   lowStockThreshold: number;
+// }
 
 export interface TransactionDrugDetail {
   drugId: string;
@@ -69,15 +72,18 @@ export interface Transaction {
   notes?: string; // Optional field for any notes
   updateDetails?: { // For 'update' type transactions
     drugId: string;
-    drugName: string;
+    drugName: string; // Current name after update
     previousName?: string;
     newName?: string;
     previousPrice?: number;
     newPrice?: number;
+    previousThreshold?: number;
+    newThreshold?: number;
   };
 }
 
 export interface EditDrugFormData {
   name: string;
   purchasePricePerStrip: number;
+  lowStockThreshold: number;
 }

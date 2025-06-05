@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { ListChecks, ArrowDownCircle, ArrowUpCircle, Edit3 } from 'lucide-react';
+import { ListChecks, ArrowDownCircle, ArrowUpCircle, Edit3, AlertCircle } from 'lucide-react';
 import type { Transaction, TransactionDrugDetail } from '@/types';
 
 export default function TransactionsPage() {
@@ -41,18 +41,28 @@ export default function TransactionsPage() {
 
   const renderUpdateDetails = (transaction: Transaction) => {
     if (transaction.type !== 'update' || !transaction.updateDetails) return null;
-    const { drugName, previousName, newName, previousPrice, newPrice } = transaction.updateDetails;
+    const { drugName, previousName, newName, previousPrice, newPrice, previousThreshold, newThreshold } = transaction.updateDetails;
     const changes = [];
-    if (newName && previousName) changes.push(`Name: "${previousName}" -> "${newName}"`);
-    else if (newName) changes.push(`Name set to: "${newName}"`);
+    if (newName && previousName && newName !== previousName) changes.push(`Name: "${previousName}" -> "${newName}"`);
+    else if (newName && !previousName) changes.push(`Name set to: "${newName}"`);
     
-    if (newPrice !== undefined && previousPrice !== undefined) changes.push(`Price: INR ${previousPrice.toFixed(2)} -> INR ${newPrice.toFixed(2)}`);
-    else if (newPrice !== undefined) changes.push(`Price set to: INR ${newPrice.toFixed(2)}`);
+    if (newPrice !== undefined && previousPrice !== undefined && newPrice !== previousPrice) changes.push(`Price: INR ${previousPrice.toFixed(2)} -> INR ${newPrice.toFixed(2)}`);
+    else if (newPrice !== undefined && previousPrice === undefined) changes.push(`Price set to: INR ${newPrice.toFixed(2)}`);
+
+    if (newThreshold !== undefined && previousThreshold !== undefined && newThreshold !== previousThreshold) changes.push(`Threshold: ${previousThreshold} -> ${newThreshold} strips`);
+    else if (newThreshold !== undefined && previousThreshold === undefined) changes.push(`Threshold set to: ${newThreshold} strips`);
+
+
+    if (changes.length === 0 && !transaction.notes?.includes('details updated')) { // if no specific changes, show generic note
+        return transaction.notes ? <p className="text-sm">{transaction.notes}</p> : <p className="text-sm text-muted-foreground">No specific field changes recorded.</p>;
+    }
+
 
     return (
       <div className="text-sm">
-        <p><strong>Drug:</strong> {drugName}</p>
-        {changes.map((change, idx) => <p key={idx}>{change}</p>)}
+        <p className="font-semibold">Updated: {drugName}</p>
+        {changes.map((change, idx) => <p key={idx}><Edit3 className="inline h-3 w-3 mr-1 text-blue-500"/>{change}</p>)}
+        {transaction.notes && !transaction.notes.startsWith('Drug details updated for') && <p className="mt-1 italic text-muted-foreground">{transaction.notes}</p>}
       </div>
     );
   }
@@ -78,7 +88,7 @@ export default function TransactionsPage() {
                   <TableRow>
                     <TableHead className="w-[180px]">Timestamp</TableHead>
                     <TableHead className="w-[120px]">Type</TableHead>
-                    <TableHead>Details</TableHead>
+                    <TableHead>Details / Patient Info</TableHead>
                     <TableHead>Drugs Involved / Changes</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -109,8 +119,8 @@ export default function TransactionsPage() {
                         {transaction.type === 'restock' && transaction.source && (
                           <p><strong>Source:</strong> {transaction.source}</p>
                         )}
-                        {transaction.type === 'update' && transaction.notes && (
-                            <p className="text-sm">{transaction.notes}</p>
+                         {transaction.type === 'update' && (
+                            transaction.notes && !transaction.notes.startsWith('Drug details updated for') ? <p className="text-sm italic">{transaction.notes}</p> : <span className="text-sm text-muted-foreground">Details changed</span>
                         )}
                       </TableCell>
                       <TableCell>

@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { Pill, LayoutGrid, MinusCircle, PackagePlus, Settings as SettingsIcon, ListChecks, Edit } from 'lucide-react';
+import { Pill, LayoutGrid, MinusCircle, PackagePlus, Edit3 as EditIcon, ListChecks } from 'lucide-react'; // Renamed SettingsIcon to avoid conflict if one existed, using Edit3 for ManageDrugs
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,9 @@ const navItems = [
   { href: '/dispense', label: 'Dispense Drugs', icon: MinusCircle },
   { href: '/restock', label: 'Restock', icon: PackagePlus },
   { href: '/', label: 'Dashboard', icon: LayoutGrid },
-  { href: '/manage-drugs', label: 'Manage Drugs', icon: Edit },
+  { href: '/manage-drugs', label: 'Manage Drugs', icon: EditIcon },
   { href: '/transactions', label: 'Transactions', icon: ListChecks },
-  { href: '/settings', label: 'Settings', icon: SettingsIcon },
+  // { href: '/settings', label: 'Settings', icon: SettingsIcon }, // Settings link removed
 ];
 
 export default function Header() {

@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Edit, Edit3 } from 'lucide-react';
 import EditDrugForm from '@/components/inventory/EditDrugForm';
-import SettingsForm from '@/components/SettingsForm'; // Import SettingsForm
+// import SettingsForm from '@/components/SettingsForm'; // Removed SettingsForm
 import {
   Dialog,
   DialogContent,
@@ -50,7 +50,7 @@ export default function ManageDrugsPage() {
             <Edit3 className="h-6 w-6 text-primary" />
             Manage Drugs
           </CardTitle>
-          <CardDescription>View and edit details of drugs in your inventory.</CardDescription>
+          <CardDescription>View and edit details of drugs in your inventory, including their low stock thresholds.</CardDescription>
         </CardHeader>
         <CardContent>
           {drugs.length === 0 ? (
@@ -63,6 +63,7 @@ export default function ManageDrugsPage() {
                     <TableHead>Name</TableHead>
                     <TableHead className="text-right">Current Stock (Strips)</TableHead>
                     <TableHead className="text-right">Purchase Price/Strip (INR)</TableHead>
+                    <TableHead className="text-right">Low Stock Threshold (Strips)</TableHead>
                     <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -72,6 +73,7 @@ export default function ManageDrugsPage() {
                       <TableCell className="font-medium">{drug.name}</TableCell>
                       <TableCell className="text-right">{drug.stock}</TableCell>
                       <TableCell className="text-right">INR {drug.purchasePricePerStrip.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{drug.lowStockThreshold}</TableCell>
                       <TableCell className="text-center">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(drug)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
@@ -104,8 +106,8 @@ export default function ManageDrugsPage() {
         </Dialog>
       )}
 
-      {/* Add SettingsForm for managing threshold */}
-      <SettingsForm />
+      {/* SettingsForm removed from here as threshold is now per-drug */}
+      {/* <SettingsForm /> */}
     </div>
   );
 }
