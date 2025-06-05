@@ -34,11 +34,12 @@ const dispenseFormSchema = z.object({
   aadharLastFour: z.string().length(4, {message: "Aadhar must be 4 digits."}).regex(/^\d{4}$/, "Must be 4 digits."),
   age: z.coerce.number().int().positive({ message: "Age must be a positive number." }),
   sex: z.enum(['Male', 'Female', 'Other', ''], { errorMap: () => ({ message: "Please select a valid sex."}) }).refine(val => val !== '', { message: "Please select a sex."}),
+  villageName: z.string().optional(), // Village name is optional
   drugsToDispense: z.array(drugDispenseEntrySchema).min(1, { message: "At least one drug must be added to dispense." }),
 });
 
 export default function DispenseForm() {
-  const { drugs, dispenseDrugs, getDrugById } = useInventory();
+  const { drugs, dispenseDrugs, getDrugById, villages: villageList } = useInventory(); // Added villageList
   const { toast } = useToast();
 
   const form = useForm<DispenseFormData>({
@@ -48,6 +49,7 @@ export default function DispenseForm() {
       aadharLastFour: '',
       age: '' as unknown as number,
       sex: '',
+      villageName: '', // Default to empty string
       drugsToDispense: [{ drugId: '', stripsDispensed: 1 }],
     },
   });
@@ -63,6 +65,7 @@ export default function DispenseForm() {
         aadharLastFour: data.aadharLastFour,
         age: data.age,
         sex: data.sex,
+        villageName: data.villageName, // Pass village name
     };
     const result = await dispenseDrugs(patientDetails, data.drugsToDispense);
 
@@ -70,7 +73,7 @@ export default function DispenseForm() {
       const drugSummary = result.dispensedDrugs.map(d => `${d.quantity}x ${d.drugName}`).join(', ');
       toast({
         title: "Dispense Successful",
-        description: `${drugSummary} dispensed to ${data.patientName}. Inventory updated locally. ${result.message || ''}`,
+        description: `${drugSummary} dispensed to ${data.patientName}${data.villageName ? ` in ${data.villageName}` : ''}. Inventory updated locally. ${result.message || ''}`,
         action: <CheckCircle className="text-green-500" />,
       });
       form.reset({
@@ -78,6 +81,7 @@ export default function DispenseForm() {
         aadharLastFour: '',
         age: '' as unknown as number,
         sex: '',
+        villageName: '',
         drugsToDispense: [{ drugId: '', stripsDispensed: 1 }],
       });
     } else {
@@ -157,6 +161,32 @@ export default function DispenseForm() {
                         <SelectItem value="Male">Male</SelectItem>
                         <SelectItem value="Female">Female</SelectItem>
                         <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="villageName"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Village / Camp Name (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select village if applicable" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {villageList.length === 0 && <SelectItem value="" disabled>No villages added yet</SelectItem>}
+                        {villageList.map((village) => (
+                          <SelectItem key={village.id} value={village.name}>
+                            {village.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

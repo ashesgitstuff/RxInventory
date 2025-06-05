@@ -29,6 +29,7 @@ export interface DispenseFormData {
   aadharLastFour: string;
   age: number;
   sex: 'Male' | 'Female' | 'Other' | '';
+  villageName?: string; // Added village name
   drugsToDispense: DrugDispenseEntry[];
 }
 
@@ -68,6 +69,7 @@ export interface Transaction {
   aadharLastFour?: string;
   age?: number;
   sex?: 'Male' | 'Female' | 'Other';
+  villageName?: string; // Added village name for dispense transactions
   source?: string; // For restock
   drugs: TransactionDrugDetail[]; // For dispense/restock: drugs involved in quantity change. For update: can be empty.
   notes?: string; // Optional field for any notes
@@ -90,4 +92,10 @@ export interface EditDrugFormData {
   purchasePricePerStrip?: number;
   lowStockThreshold?: number;
   initialSource?: string;
+}
+
+// New type for Village
+export interface Village {
+  id: string;
+  name: string;
 }

@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { ListChecks, ArrowDownCircle, ArrowUpCircle, Edit3, AlertCircle } from 'lucide-react';
+import { ListChecks, ArrowDownCircle, ArrowUpCircle, Edit3, AlertCircle, MapPin } from 'lucide-react'; // Added MapPin
 import type { Transaction, TransactionDrugDetail } from '@/types';
 
 export default function TransactionsPage() {
@@ -60,7 +60,6 @@ export default function TransactionsPage() {
         return transaction.notes ? <p className="text-sm">{transaction.notes}</p> : <p className="text-sm text-muted-foreground">No specific field changes recorded.</p>;
     }
 
-
     return (
       <div className="text-sm">
         <p className="font-semibold">Updated: {drugName}</p>
@@ -78,7 +77,7 @@ export default function TransactionsPage() {
             <ListChecks className="h-6 w-6 text-primary" />
             Transaction Log
           </CardTitle>
-          <CardDescription>A record of all inventory movements and updates.</CardDescription>
+          <CardDescription>A record of all inventory movements, updates, and camp details.</CardDescription>
         </CardHeader>
         <CardContent>
           {sortedTransactions.length === 0 ? (
@@ -91,7 +90,7 @@ export default function TransactionsPage() {
                   <TableRow>
                     <TableHead className="w-[180px]">Timestamp</TableHead>
                     <TableHead className="w-[120px]">Type</TableHead>
-                    <TableHead>Details / Patient Info</TableHead>
+                    <TableHead>Details / Patient & Camp Info</TableHead>
                     <TableHead>Drugs Involved / Changes</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -111,12 +110,13 @@ export default function TransactionsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {transaction.type === 'dispense' && transaction.patientName && (
-                          <div className="text-sm">
-                            <p><strong>Patient:</strong> {transaction.patientName}</p>
+                        {transaction.type === 'dispense' && (
+                          <div className="text-sm space-y-0.5">
+                            {transaction.patientName && <p><strong>Patient:</strong> {transaction.patientName}</p>}
                             {transaction.aadharLastFour && <p><strong>Aadhar (Last 4):</strong> {transaction.aadharLastFour}</p>}
                             {transaction.age && <p><strong>Age:</strong> {transaction.age}</p>}
                             {transaction.sex && <p><strong>Sex:</strong> {transaction.sex}</p>}
+                            {transaction.villageName && <p className="flex items-center"><MapPin className="inline h-3.5 w-3.5 mr-1 text-muted-foreground"/><strong>Village:</strong> {transaction.villageName}</p>}
                           </div>
                         )}
                         {transaction.type === 'restock' && transaction.source && (
