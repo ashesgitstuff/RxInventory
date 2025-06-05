@@ -12,6 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Button } from '@/components/ui/button'; // Added this import
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -125,7 +126,7 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
             "text-muted-foreground"
           )}>
             <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-            Earliest Expiry: {formatDateSafe(earliestExpiryDisplayDate)} {earliestExpiryWarning && earliestExpiryWarning !== "Expires soon" && `(${earliestExpiryWarning})`}
+            Earliest Expiry: {formatDateSafe(earliestBatch?.dateOfExpiry)} {earliestExpiryWarning && earliestExpiryWarning !== "Expires soon" && `(${earliestExpiryWarning})`}
           </div>
         )}
       </CardContent>
