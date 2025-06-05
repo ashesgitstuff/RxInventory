@@ -38,19 +38,17 @@ export interface NewDrugDetails {
 
 export interface DrugRestockEntry {
   drugId: string; // Can be '--add-new--'
-  newDrugDetails?: NewDrugDetails; // Only if drugId is '--add-new--'
   stripsAdded: number;
+  // For new drugs:
+  newDrugDetails?: NewDrugDetails; // name, purchasePricePerStrip, lowStockThreshold
+  // For existing drugs, if price is being updated during this restock:
+  updatedPurchasePricePerStrip?: number;
 }
 
 export interface RestockFormData {
   source: string;
   drugsToRestock: DrugRestockEntry[];
 }
-
-// SettingsFormData is no longer needed as threshold is per-drug
-// export interface SettingsFormData {
-//   lowStockThreshold: number;
-// }
 
 export interface TransactionDrugDetail {
   drugId: string;
@@ -69,7 +67,7 @@ export interface Transaction {
   age?: number;
   sex?: 'Male' | 'Female' | 'Other';
   source?: string; // For restock
-  drugs: TransactionDrugDetail[];
+  drugs: TransactionDrugDetail[]; // For dispense/restock: drugs involved in quantity change. For update: can be empty.
   notes?: string; // Optional field for any notes
   updateDetails?: { // For 'update' type transactions
     drugId: string;

@@ -3,14 +3,14 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { Drug, Transaction, TransactionDrugDetail, NewDrugDetails, EditDrugFormData } from '@/types';
+import type { Drug, Transaction, TransactionDrugDetail, NewDrugDetails, EditDrugFormData, DrugRestockEntry } from '@/types';
 import { INITIAL_DRUGS, DEFAULT_PURCHASE_PRICE, DEFAULT_DRUG_LOW_STOCK_THRESHOLD } from '@/types';
 
 interface InventoryContextType {
   drugs: Drug[];
   transactions: Transaction[];
   dispenseDrugs: (patientDetails: { patientName: string; aadharLastFour: string; age: number; sex: 'Male' | 'Female' | 'Other' | ''; }, drugsToDispense: Array<{ drugId: string; stripsDispensed: number }>) => { success: boolean; message?: string; dispensedDrugs: Array<{ drugName: string; quantity: number}> };
-  restockDrugs: (source: string, drugsToRestock: Array<{ drugId: string; newDrugDetails?: NewDrugDetails; stripsAdded: number }>) => { success: boolean; message?: string; restockedDrugs: Array<{ drugName: string; quantity: number}> };
+  restockDrugs: (source: string, drugsToRestock: Array<DrugRestockEntry>) => { success: boolean; message?: string; restockedDrugs: Array<{ drugName: string; quantity: number}> };
   addNewDrug: (newDrugData: NewDrugDetails & { initialStock: number }, initialSource: string) => Drug;
   updateDrugDetails: (drugId: string, data: EditDrugFormData) => { success: boolean; message?: string; updatedDrug?: Drug };
   getDrugById: (drugId: string) => Drug | undefined;
@@ -19,8 +19,8 @@ interface InventoryContextType {
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_DRUGS_KEY = 'rxinventory_drugs_v5'; // Incremented version due to structure change (initialSource)
-const LOCAL_STORAGE_TRANSACTIONS_KEY = 'rxinventory_transactions_v4';
+const LOCAL_STORAGE_DRUGS_KEY = 'rxinventory_drugs_v6'; // Incremented version due to structure change
+const LOCAL_STORAGE_TRANSACTIONS_KEY = 'rxinventory_transactions_v5'; // Incremented version
 
 export const InventoryProvider = ({ children }: { children: ReactNode }) => {
   const [drugs, setDrugs] = useState<Drug[]>(() => {
@@ -31,14 +31,14 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
         return parsedDrugs.map((drug: Drug) => ({
           ...drug,
           lowStockThreshold: drug.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
-          initialSource: drug.initialSource // Will be undefined if not present, handled at display
+          initialSource: drug.initialSource 
         }));
       } catch (error) {
         console.error("Error parsing saved drugs from localStorage:", error);
         return INITIAL_DRUGS.map(drug => ({
             ...drug, 
             lowStockThreshold: drug.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
-            initialSource: drug.initialSource ?? "System Setup" // Ensure initial drugs have a source
+            initialSource: drug.initialSource ?? "System Setup" 
         }));
       }
     }
@@ -163,10 +163,9 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
     return { success: true, dispensedDrugs: successfullyDispensedForToast };
   };
 
-
   const restockDrugs = (
-    source: string, // This is the source for the overall transaction
-    drugsToRestock: Array<{ drugId: string; newDrugDetails?: NewDrugDetails; stripsAdded: number }>
+    source: string, 
+    drugsToRestock: Array<DrugRestockEntry>
   ): { success: boolean; message?: string; restockedDrugs: Array<{drugName: string; quantity: number}> } => {
     const transactionDrugDetails: TransactionDrugDetail[] = [];
     let tempDrugs = [...drugs]; 
@@ -176,30 +175,21 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
       let drugId = item.drugId;
       let drugName = '';
       let currentDrugIndex = -1;
-      let newDrugCreated = false;
 
       if (item.drugId === '--add-new--' && item.newDrugDetails) {
-        const existing = getDrugByName(item.newDrugDetails.name);
-        if (existing) {
-            drugId = existing.id;
-            drugName = existing.name;
-            currentDrugIndex = tempDrugs.findIndex(d => d.id === drugId);
-        } else {
-            const newDrug: Drug = {
-              id: item.newDrugDetails.name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
-              name: item.newDrugDetails.name,
-              purchasePricePerStrip: item.newDrugDetails.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE,
-              stock: 0, // Will be updated below
-              lowStockThreshold: item.newDrugDetails.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
-              initialSource: source, // Use the transaction source as the initial source for the new drug
-            };
-            tempDrugs.push(newDrug);
-            drugId = newDrug.id;
-            drugName = newDrug.name;
-            currentDrugIndex = tempDrugs.length - 1;
-            newDrugCreated = true;
-        }
-
+        // This logic assumes the form-level validation for duplicates has passed
+        const newDrug: Drug = {
+          id: item.newDrugDetails.name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
+          name: item.newDrugDetails.name,
+          purchasePricePerStrip: item.newDrugDetails.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE,
+          stock: 0, 
+          lowStockThreshold: item.newDrugDetails.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
+          initialSource: source, 
+        };
+        tempDrugs.push(newDrug);
+        drugId = newDrug.id;
+        drugName = newDrug.name;
+        currentDrugIndex = tempDrugs.length - 1;
       } else {
         currentDrugIndex = tempDrugs.findIndex(d => d.id === item.drugId);
         if (currentDrugIndex === -1) {
@@ -207,18 +197,28 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
           continue; 
         }
         drugName = tempDrugs[currentDrugIndex].name;
+
+        // Handle price update for existing drug
+        if (item.updatedPurchasePricePerStrip !== undefined && tempDrugs[currentDrugIndex].purchasePricePerStrip !== item.updatedPurchasePricePerStrip) {
+          const oldPrice = tempDrugs[currentDrugIndex].purchasePricePerStrip;
+          tempDrugs[currentDrugIndex].purchasePricePerStrip = item.updatedPurchasePricePerStrip;
+          addTransaction({
+            type: 'update',
+            drugs: [], 
+            notes: `Purchase price updated for ${drugName} during restock from ${source}.`,
+            updateDetails: {
+              drugId: drugId,
+              drugName: drugName,
+              previousPrice: oldPrice,
+              newPrice: item.updatedPurchasePricePerStrip,
+            }
+          });
+        }
       }
       
       const previousStock = tempDrugs[currentDrugIndex].stock;
       tempDrugs[currentDrugIndex] = { ...tempDrugs[currentDrugIndex], stock: previousStock + item.stripsAdded };
       
-      if (newDrugCreated && item.newDrugDetails) {
-        // These are already set during newDrug object creation above
-        // tempDrugs[currentDrugIndex].purchasePricePerStrip = item.newDrugDetails.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE;
-        // tempDrugs[currentDrugIndex].lowStockThreshold = item.newDrugDetails.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD;
-      }
-
-
       successfullyRestockedForToast.push({drugName: drugName, quantity: item.stripsAdded});
       
       transactionDrugDetails.push({
@@ -248,43 +248,49 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, message: "Drug not found." };
     }
 
+    // Check for name uniqueness only if the name is actually changing
     if (data.name && data.name.toLowerCase() !== drugs[drugIndex].name.toLowerCase()) {
-      if (getDrugByName(data.name)) {
+      const existingDrugWithNewName = getDrugByName(data.name);
+      // Ensure the found drug is not the same drug we are editing
+      if (existingDrugWithNewName && existingDrugWithNewName.id !== drugId) { 
         return { success: false, message: `A drug named "${data.name}" already exists.` };
       }
     }
     
     const oldDrug = drugs[drugIndex];
-    const updatedDrug = {
+    const updatedDrugData = {
       ...oldDrug,
       name: data.name ?? oldDrug.name,
       purchasePricePerStrip: data.purchasePricePerStrip ?? oldDrug.purchasePricePerStrip,
       lowStockThreshold: data.lowStockThreshold ?? oldDrug.lowStockThreshold,
-      // initialSource is not editable via this form, it's set at creation
     };
 
-    const updatedDrugs = [...drugs];
-    updatedDrugs[drugIndex] = updatedDrug;
-    setDrugs(updatedDrugs);
+    const updatedDrugsList = [...drugs];
+    updatedDrugsList[drugIndex] = updatedDrugData;
+    setDrugs(updatedDrugsList);
 
     const transactionUpdateDetails: Transaction['updateDetails'] = {
-      drugId: updatedDrug.id,
-      drugName: updatedDrug.name,
+      drugId: updatedDrugData.id,
+      drugName: updatedDrugData.name, 
     };
+    let detailsChanged = false;
     if (data.name && data.name !== oldDrug.name) {
       transactionUpdateDetails.previousName = oldDrug.name;
       transactionUpdateDetails.newName = data.name;
+      detailsChanged = true;
     }
     if (data.purchasePricePerStrip !== undefined && data.purchasePricePerStrip !== oldDrug.purchasePricePerStrip) {
       transactionUpdateDetails.previousPrice = oldDrug.purchasePricePerStrip;
       transactionUpdateDetails.newPrice = data.purchasePricePerStrip;
+      detailsChanged = true;
     }
     if (data.lowStockThreshold !== undefined && data.lowStockThreshold !== oldDrug.lowStockThreshold) {
       transactionUpdateDetails.previousThreshold = oldDrug.lowStockThreshold;
       transactionUpdateDetails.newThreshold = data.lowStockThreshold;
+      detailsChanged = true;
     }
 
-    if (Object.keys(transactionUpdateDetails).length > 2) { 
+    if (detailsChanged) { 
         addTransaction({
             type: 'update',
             drugs: [], 
@@ -293,7 +299,7 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
         });
     }
 
-    return { success: true, updatedDrug };
+    return { success: true, updatedDrug: updatedDrugData };
   };
 
   return (
