@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Added useEffect for completeness, though not strictly used by the fix
 import * as XLSX from 'xlsx';
 import { format, parseISO, isValid, startOfDay, endOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -218,7 +218,11 @@ export default function ExportDataDialog({
                   {formatDateForDisplay(startDate)}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent 
+                className="w-auto p-0" 
+                align="start"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
                 <Calendar
                   mode="single"
                   selected={startDate}
@@ -246,7 +250,11 @@ export default function ExportDataDialog({
                   {formatDateForDisplay(endDate)}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent 
+                className="w-auto p-0" 
+                align="start"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
                 <Calendar
                   mode="single"
                   selected={endDate}
@@ -273,3 +281,5 @@ export default function ExportDataDialog({
     </Dialog>
   );
 }
+
+    
