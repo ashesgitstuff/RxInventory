@@ -105,7 +105,7 @@ export default function RestockForm() {
       let pricePerStrip = 0;
       if (item.drugId === '--add-new--' && item.newDrugDetails) {
         pricePerStrip = Number(item.newDrugDetails.purchasePricePerStrip) || 0;
-      } else if (item.drugId !== '--add-new--') {
+      } else if (item.drugId !== '--add-new--' && item.drugId !== '') { // Added item.drugId !== '' for existing drug check
         
         const drug = getDrugById(item.drugId);
         pricePerStrip = item.updatedPurchasePricePerStrip !== undefined 
@@ -129,11 +129,10 @@ export default function RestockForm() {
             purchasePricePerStrip: DEFAULT_PURCHASE_PRICE, 
             lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD 
         });
-        form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerStrip`, undefined); // Keep undefined as it won't be rendered
+        form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerStrip`, undefined);
     } else {
         form.setValue(`drugsToRestock.${index}.newDrugDetails`, undefined);
         const selectedDrug = getDrugById(value);
-        // Ensure updatedPurchasePricePerStrip is a number for controlled input
         form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerStrip`, selectedDrug?.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE);
     }
     form.trigger(`drugsToRestock.${index}.newDrugDetails`);
@@ -182,8 +181,8 @@ export default function RestockForm() {
     if (result.success) {
       const drugSummary = result.restockedDrugs.map(d => `${d.quantity}x ${d.drugName}`).join(', ');
       toast({
-        title: "Restock Successful",
-        description: `${drugSummary} added from ${data.source}. Inventory and prices updated in Firestore. Total cost: INR ${grandTotal.toFixed(2)}`,
+        title: "Drugs Added to Stock",
+        description: `${drugSummary} successfully added from ${data.source}. Inventory in Firestore is updated. Total cost: INR ${grandTotal.toFixed(2)}.`,
         action: <CheckCircle className="text-green-500" />,
       });
       form.reset({
@@ -236,7 +235,7 @@ export default function RestockForm() {
 
     if (item.drugId === '--add-new--' && item.newDrugDetails) {
         price = item.newDrugDetails.purchasePricePerStrip;
-    } else if (item.drugId !== '--add-new--') {
+    } else if (item.drugId !== '--add-new--' && item.drugId !== '') {
         price = item.updatedPurchasePricePerStrip; 
     }
     
@@ -281,19 +280,20 @@ export default function RestockForm() {
                         size="icon"
                         className="absolute top-2 right-2 text-destructive hover:bg-destructive/10 z-10"
                         onClick={() => {
+                            const currentFields = form.getValues("drugsToRestock");
                             remove(index);
-                            setFieldStates(prev => {
-                                const newState = {...prev};
-                                delete newState[index];
-                                // Adjust subsequent indices
-                                for (let i = index + 1; i < fields.length; i++) {
-                                    if (newState[i]) {
-                                        newState[i-1] = newState[i];
-                                        delete newState[i];
+                            // Adjust fieldStates after removing an item
+                            const newFieldStates: Record<number, { isNewDrug: boolean }> = {};
+                            let newIdx = 0;
+                            for (let i = 0; i < currentFields.length; i++) {
+                                if (i !== index) {
+                                    if (fieldStates[i]) {
+                                        newFieldStates[newIdx] = fieldStates[i];
                                     }
+                                    newIdx++;
                                 }
-                                return newState;
-                            });
+                            }
+                            setFieldStates(newFieldStates);
                         }}
                     >
                         <Trash2 className="h-4 w-4" />
@@ -365,10 +365,14 @@ export default function RestockForm() {
                             name={`drugsToRestock.${index}.updatedPurchasePricePerStrip`}
                             render={({ field }) => (
                                 <FormControl>
-                                    <Input type="number" placeholder="Price" {...field} min="0" step="0.01" 
-                                     // Ensure the value is not undefined
-                                     value={field.value === undefined ? '' : field.value}
-                                     onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                                    <Input 
+                                      type="number" 
+                                      placeholder="Price" 
+                                      {...field} 
+                                      min="0" 
+                                      step="0.01" 
+                                      value={field.value === undefined ? '' : field.value} // Handle undefined for controlled input
+                                      onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                                     />
                                 </FormControl>
                             )}
@@ -422,7 +426,7 @@ export default function RestockForm() {
               type="button"
               variant="outline"
               onClick={() => {
-                const newIndex = fields.length; // Get index before append
+                const newIndex = fields.length; 
                 append({ 
                     drugId: '', 
                     stripsAdded: 10, 
@@ -434,7 +438,6 @@ export default function RestockForm() {
                     updatedPurchasePricePerStrip: DEFAULT_PURCHASE_PRICE 
                   });
                   
-                  // Initialize fieldState for the new item
                   setFieldStates(prev => ({...prev, [newIndex]: {isNewDrug: false}}));
                 }}
               className="w-full flex items-center gap-2"
