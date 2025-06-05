@@ -5,37 +5,45 @@ import { useInventory } from '@/contexts/InventoryContext';
 import DrugStockCard from '@/components/inventory/DrugStockCard';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, Loader2 } from 'lucide-react';
-import React from 'react';
+import { PlusCircle, Loader2, RotateCcw, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
 import type { Drug } from '@/types';
-
-// This interface can be simplified or aligned with GroupedDrugDisplay from types.ts if needed
-// For now, keeping it separate as dashboard might have slightly different needs.
-interface DashboardGroupedDrug {
-  groupKey: string; // Should align with the key from getDrugGroupsForDisplay
-  displayName: string; 
-  genericName: string;
-  brandName?: string;
-  dosage?: string;
-  totalStock: number;
-  lowStockThreshold: number; 
-  batches: Drug[];
-}
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
 export default function DashboardPage() {
-  const { drugs, loading, getDrugGroupsForDisplay } = useInventory(); 
+  const { drugs, loading, getDrugGroupsForDisplay, resetInventoryData } = useInventory();
   const [isClient, setIsClient] = React.useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   React.useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Use getDrugGroupsForDisplay from context to ensure consistency
   const groupedDrugsForDashboard = React.useMemo(() => {
-    if (loading || !isClient) return []; // Prevent running if not loaded or not client
-    return getDrugGroupsForDisplay(); // This now returns GroupedDrugDisplay[]
+    if (loading || !isClient) return [];
+    return getDrugGroupsForDisplay();
   }, [loading, isClient, getDrugGroupsForDisplay]);
 
+  const handleResetData = () => {
+    resetInventoryData();
+    toast({
+      title: "Data Reset Successful",
+      description: "All inventory, transactions, and villages have been reset to their default state.",
+    });
+    setIsResetDialogOpen(false); // Close the dialog after reset
+  };
 
   if (!isClient || loading) {
     return (
@@ -56,6 +64,37 @@ export default function DashboardPage() {
             <PlusCircle className="mr-2 h-4 w-4" /> Add Initial Stock
           </Link>
         </Button>
+
+        <div className="mt-12 pt-8 border-t border-border">
+          <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" className="shadow-md hover:shadow-lg transition-shadow">
+                <RotateCcw className="mr-2 h-4 w-4" /> Reset All Data
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  Are you absolutely sure?
+                  </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete all your current
+                  inventory, transaction, and village data, and reset it to the application defaults.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleResetData} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                  Yes, Reset Data
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <p className="text-xs text-muted-foreground mt-2">
+            Use this to clear all data and start fresh.
+          </p>
+        </div>
       </div>
     );
   }
@@ -68,8 +107,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {groupedDrugsForDashboard.map((group) => (
-          // DrugStockCard expects GroupedDrugDisplay which is what getDrugGroupsForDisplay returns
-          <DrugStockCard key={group.groupKey} drugGroup={group} /> 
+          <DrugStockCard key={group.groupKey} drugGroup={group} />
         ))}
       </div>
       
@@ -81,9 +119,37 @@ export default function DashboardPage() {
           <Link href="/restock">Restock Inventory</Link>
         </Button>
       </div>
+
+      <div className="mt-12 pt-8 border-t border-border text-center">
+        <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" className="shadow-md hover:shadow-lg transition-shadow">
+              <RotateCcw className="mr-2 h-4 w-4" /> Reset All Data
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Are you absolutely sure?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete all your current
+                inventory, transaction, and village data, and reset it to the application defaults.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleResetData} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                Yes, Reset Data
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <p className="text-xs text-muted-foreground mt-2">
+          Use this to clear all data and start fresh.
+        </p>
+      </div>
     </div>
   );
 }
-
-
-    
