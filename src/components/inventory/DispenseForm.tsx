@@ -18,15 +18,14 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useInventory } from '@/contexts/InventoryContext';
-import type { DispenseFormData } from '@/types'; // DrugDispenseEntry uses drugId of a specific batch
+import type { DispenseFormData, DrugDispenseEntry, GroupedDrugDisplay } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, MinusCircle, PlusCircle, Trash2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { format, parseISO } from 'date-fns';
 
-
 const drugDispenseEntrySchema = z.object({
-  drugId: z.string().min(1, { message: "Please select a drug batch." }), // drugId is for a specific batch
+  selectedDrugGroupKey: z.string().min(1, { message: "Please select a drug type." }),
   stripsDispensed: z.coerce.number().int().positive({ message: "Strips must be a positive number." }),
 });
 
@@ -36,7 +35,7 @@ const dispenseFormSchema = z.object({
   age: z.coerce.number().int().positive({ message: "Age must be a positive number." }),
   sex: z.enum(['Male', 'Female', 'Other', ''], { errorMap: () => ({ message: "Please select a valid sex."}) }).refine(val => val !== '', { message: "Please select a sex."}),
   villageName: z.string().optional(),
-  drugsToDispense: z.array(drugDispenseEntrySchema).min(1, { message: "At least one drug batch must be added to dispense." }),
+  drugsToDispense: z.array(drugDispenseEntrySchema).min(1, { message: "At least one drug type must be added to dispense." }),
 });
 
 const formatDateSafeShort = (dateString?: string) => {
@@ -49,18 +48,22 @@ const formatDateSafeShort = (dateString?: string) => {
 };
 
 export default function DispenseForm() {
-  const { drugs, dispenseDrugs, villages: villageList } = useInventory(); // `drugs` is the list of all batches
+  const { getDrugGroupsForDisplay, dispenseDrugs, villages: villageList } = useInventory();
   const { toast } = useToast();
+
+  const availableDrugGroups = React.useMemo(() => {
+    return getDrugGroupsForDisplay().filter(group => group.totalStock > 0);
+  }, [getDrugGroupsForDisplay]);
 
   const form = useForm<DispenseFormData>({
     resolver: zodResolver(dispenseFormSchema),
     defaultValues: {
       patientName: '',
       aadharLastFour: '',
-      age: '' as unknown as number,
-      sex: '',
-      villageName: '',
-      drugsToDispense: [{ drugId: '', stripsDispensed: 1 }],
+      age: '' as unknown as number, // Keep this for resolver compatibility
+      sex: '', // Default to empty, placeholder will show
+      villageName: '', // Default to empty, placeholder will show
+      drugsToDispense: [{ selectedDrugGroupKey: '', stripsDispensed: 1 }],
     },
   });
 
@@ -68,9 +71,6 @@ export default function DispenseForm() {
     control: form.control,
     name: "drugsToDispense",
   });
-
-  // Filter out batches with zero stock for the dropdown
-  const availableDrugBatches = React.useMemo(() => drugs.filter(batch => batch.stock > 0), [drugs]);
 
   async function onSubmit(data: DispenseFormData) {
     const patientDetails = {
@@ -80,10 +80,11 @@ export default function DispenseForm() {
         sex: data.sex,
         villageName: data.villageName,
     };
+    // The drugsToDispense from data already contains selectedDrugGroupKey and stripsDispensed
     const result = await dispenseDrugs(patientDetails, data.drugsToDispense);
 
     if (result.success) {
-      const drugSummary = result.dispensedDrugs.map(d => `${d.quantity}x ${d.brandName || d.drugName} ${d.dosage || ''} (Batch: ${d.batchNumber})`).join(', ');
+      const drugSummary = result.dispensedDrugsInfo.map(d => `${d.quantity}x ${d.brandName || d.drugName} ${d.dosage || ''} (from batch: ${d.batchNumber})`).join(', ');
       toast({
         title: "Dispense Successful",
         description: `${drugSummary} dispensed to ${data.patientName}${data.villageName ? ` in ${data.villageName}` : ''}. ${result.message || ''}`,
@@ -95,7 +96,7 @@ export default function DispenseForm() {
         age: '' as unknown as number,
         sex: '',
         villageName: '',
-        drugsToDispense: [{ drugId: '', stripsDispensed: 1 }],
+        drugsToDispense: [{ selectedDrugGroupKey: '', stripsDispensed: 1 }],
       });
     } else {
       toast({
@@ -113,7 +114,7 @@ export default function DispenseForm() {
           <MinusCircle className="h-6 w-6 text-primary" />
           Dispense Drugs
         </CardTitle>
-        <CardDescription>Enter patient and drug batch details to dispense medication.</CardDescription>
+        <CardDescription>Enter patient and drug details to dispense medication. Drugs will be dispensed from the batch with the closest expiry date automatically.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -122,32 +123,63 @@ export default function DispenseForm() {
               <FormField control={form.control} name="patientName" render={({ field }) => (<FormItem><FormLabel>Patient Name</FormLabel><FormControl><Input placeholder="Enter patient's full name" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="aadharLastFour" render={({ field }) => (<FormItem><FormLabel>Aadhar (Last 4 Digits)</FormLabel><FormControl><Input type="text" placeholder="1234" {...field} maxLength={4} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="age" render={({ field }) => (<FormItem><FormLabel>Age</FormLabel><FormControl><Input type="number" placeholder="Enter age" {...field} min="0" /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="sex" render={({ field }) => (<FormItem><FormLabel>Sex</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select sex" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="villageName" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>Village / Camp Name (Optional)</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select village if applicable" /></SelectTrigger></FormControl><SelectContent><SelectItem value="">None</SelectItem>{villageList.length === 0 && <SelectItem value="" disabled>No villages added yet</SelectItem>}{villageList.map((village) => (<SelectItem key={village.id} value={village.name}>{village.name}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="sex" render={({ field }) => (<FormItem><FormLabel>Sex</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select sex" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Male">Male</SelectItem><SelectItem value="Female">Female</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+              <FormField
+                control={form.control}
+                name="villageName"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Village / Camp Name (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}> {/* Use value for controlled component */}
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select village if applicable" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {villageList.length === 0 ? (
+                           <div className="p-2 text-center text-sm text-muted-foreground">
+                             No villages added. Add on Camps page.
+                           </div>
+                        ) : (
+                          villageList.map((village) => (
+                            <SelectItem key={village.id} value={village.name}>
+                              {village.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
             
             <Separator />
-            <h3 className="text-lg font-medium text-foreground">Drug Batches to Dispense</h3>
+            <h3 className="text-lg font-medium text-foreground">Drug Types to Dispense</h3>
             {fields.map((item, index) => (
               <div key={item.id} className="space-y-4 p-4 border rounded-md shadow-sm relative">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name={`drugsToDispense.${index}.drugId`}
+                    name={`drugsToDispense.${index}.selectedDrugGroupKey`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Drug Batch</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormLabel>Drug Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select a drug batch" />
+                              <SelectValue placeholder="Select a drug type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent className="max-h-72">
-                            {availableDrugBatches.length === 0 && <SelectItem value="" disabled>No batches in stock</SelectItem>}
-                            {availableDrugBatches.map((batch) => (
-                              <SelectItem key={batch.id} value={batch.id} disabled={batch.stock === 0}>
-                                {batch.brandName || batch.name} {batch.dosage} (Batch: {batch.batchNumber}) Exp: {formatDateSafeShort(batch.dateOfExpiry)} (Stock: {batch.stock})
+                            {availableDrugGroups.length === 0 && 
+                              <div className="p-2 text-center text-sm text-muted-foreground">No drugs in stock</div>
+                            }
+                            {availableDrugGroups.map((group) => (
+                              <SelectItem key={group.groupKey} value={group.groupKey}>
+                                {group.displayName} (Stock: {group.totalStock})
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -177,8 +209,8 @@ export default function DispenseForm() {
                 )}
               </div>
             ))}
-            <Button type="button" variant="outline" onClick={() => append({ drugId: '', stripsDispensed: 1 })} className="w-full flex items-center gap-2">
-              <PlusCircle className="h-4 w-4" /> Add Another Drug Batch
+            <Button type="button" variant="outline" onClick={() => append({ selectedDrugGroupKey: '', stripsDispensed: 1 })} className="w-full flex items-center gap-2">
+              <PlusCircle className="h-4 w-4" /> Add Another Drug Type
             </Button>
 
             <Separator />
@@ -191,3 +223,4 @@ export default function DispenseForm() {
     </Card>
   );
 }
+    
