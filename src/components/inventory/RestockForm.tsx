@@ -83,7 +83,7 @@ export default function RestockForm() {
           purchasePricePerStrip: DEFAULT_PURCHASE_PRICE, 
           lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD 
         },
-        updatedPurchasePricePerStrip: undefined 
+        updatedPurchasePricePerStrip: DEFAULT_PURCHASE_PRICE 
       }],
     },
   });
@@ -129,10 +129,11 @@ export default function RestockForm() {
             purchasePricePerStrip: DEFAULT_PURCHASE_PRICE, 
             lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD 
         });
-        form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerStrip`, undefined);
+        form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerStrip`, undefined); // Keep undefined as it won't be rendered
     } else {
         form.setValue(`drugsToRestock.${index}.newDrugDetails`, undefined);
         const selectedDrug = getDrugById(value);
+        // Ensure updatedPurchasePricePerStrip is a number for controlled input
         form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerStrip`, selectedDrug?.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE);
     }
     form.trigger(`drugsToRestock.${index}.newDrugDetails`);
@@ -195,7 +196,7 @@ export default function RestockForm() {
                 purchasePricePerStrip: DEFAULT_PURCHASE_PRICE, 
                 lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD 
             },
-            updatedPurchasePricePerStrip: undefined
+            updatedPurchasePricePerStrip: DEFAULT_PURCHASE_PRICE
         }],
       });
       setFieldStates({}); 
@@ -236,10 +237,7 @@ export default function RestockForm() {
     if (item.drugId === '--add-new--' && item.newDrugDetails) {
         price = item.newDrugDetails.purchasePricePerStrip;
     } else if (item.drugId !== '--add-new--') {
-        
         price = item.updatedPurchasePricePerStrip; 
-        
-        
     }
     
     return price !== undefined ? `INR ${Number(price).toFixed(2)}` : 'N/A';
@@ -287,6 +285,13 @@ export default function RestockForm() {
                             setFieldStates(prev => {
                                 const newState = {...prev};
                                 delete newState[index];
+                                // Adjust subsequent indices
+                                for (let i = index + 1; i < fields.length; i++) {
+                                    if (newState[i]) {
+                                        newState[i-1] = newState[i];
+                                        delete newState[i];
+                                    }
+                                }
                                 return newState;
                             });
                         }}
@@ -360,7 +365,11 @@ export default function RestockForm() {
                             name={`drugsToRestock.${index}.updatedPurchasePricePerStrip`}
                             render={({ field }) => (
                                 <FormControl>
-                                    <Input type="number" placeholder="Price" {...field} min="0" step="0.01" />
+                                    <Input type="number" placeholder="Price" {...field} min="0" step="0.01" 
+                                     // Ensure the value is not undefined
+                                     value={field.value === undefined ? '' : field.value}
+                                     onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                                    />
                                 </FormControl>
                             )}
                         />
@@ -413,6 +422,7 @@ export default function RestockForm() {
               type="button"
               variant="outline"
               onClick={() => {
+                const newIndex = fields.length; // Get index before append
                 append({ 
                     drugId: '', 
                     stripsAdded: 10, 
@@ -421,13 +431,11 @@ export default function RestockForm() {
                         purchasePricePerStrip: DEFAULT_PURCHASE_PRICE, 
                         lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD 
                       },
-                    updatedPurchasePricePerStrip: undefined 
+                    updatedPurchasePricePerStrip: DEFAULT_PURCHASE_PRICE 
                   });
                   
-                  const newIndex = fields.length; 
+                  // Initialize fieldState for the new item
                   setFieldStates(prev => ({...prev, [newIndex]: {isNewDrug: false}}));
-
-
                 }}
               className="w-full flex items-center gap-2"
             >
