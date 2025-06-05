@@ -42,18 +42,18 @@ const newDrugDetailsSchema = z.object({
             const mfg = parseISO(data.dateOfManufacture);
             const exp = parseISO(data.dateOfExpiry);
             return mfg < exp;
-        } catch (e) { return true; } // Let other validators handle parse errors
+        } catch (e) { return true; } 
     }
     return true;
 }, { message: "Expiry date must be after manufacture date.", path: ["dateOfExpiry"] });
 
 
 const drugRestockEntrySchema = z.object({
-  drugId: z.string().min(1, { message: "Please select an existing batch or 'Add New Batch'." }), // drugId refers to a specific batch
+  drugId: z.string().min(1, { message: "Please select an existing batch or 'Add New Batch'." }), 
   stripsAdded: z.coerce.number().int().positive({ message: "Strips must be a positive number." }),
-  newDrugDetails: newDrugDetailsSchema.optional(), // Only if drugId is '--add-new--'
-  updatedPurchasePricePerStrip: z.coerce.number().min(0, { message: "Price must be non-negative." }).optional(), // For existing batches
-}).refine(data => { // Validation for "Add New Batch"
+  newDrugDetails: newDrugDetailsSchema.optional(), 
+  updatedPurchasePricePerStrip: z.coerce.number().min(0, { message: "Price must be non-negative." }).optional(), 
+}).refine(data => { 
     if (data.drugId === '--add-new--') {
         return !!data.newDrugDetails &&
                data.newDrugDetails.name.length >=2 &&
@@ -166,7 +166,6 @@ export default function RestockForm() {
         form.setValue(`drugsToRestock.${index}.newDrugDetails.brandName`, matchedDrug.brandName || '');
         form.setValue(`drugsToRestock.${index}.newDrugDetails.dosage`, matchedDrug.dosage || '');
       }
-      // If no match, current form values (likely empty or manually entered) for brand/dosage persist.
     }
   };
 
@@ -298,7 +297,7 @@ export default function RestockForm() {
                                 field.onChange(value);
                                 handleDrugIdChange(index, value);
                             }}
-                            value={field.value} // Ensure it's a controlled component
+                            value={field.value} 
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -357,7 +356,6 @@ export default function RestockForm() {
                                       {...field}
                                       min="0"
                                       step="0.01"
-                                      value={field.value === undefined ? '' : field.value}
                                       onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                                     />
                                 </FormControl>
@@ -383,8 +381,9 @@ export default function RestockForm() {
                                     <Input
                                         placeholder="e.g., Paracetamol"
                                         {...field}
+                                        value={field.value ?? ''}
                                         onBlur={(e) => {
-                                            field.onBlur(e); // RHF internal onBlur
+                                            field.onBlur(e); 
                                             handleGenericNameBlur(index, e.target.value);
                                         }}
                                     />
@@ -393,17 +392,17 @@ export default function RestockForm() {
                             </FormItem>
                         )} />
                         <FormField control={form.control} name={`drugsToRestock.${index}.newDrugDetails.brandName`}
-                        render={({ field }) => (<FormItem><FormLabel>Brand Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Calpol" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        render={({ field }) => (<FormItem><FormLabel>Brand Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Calpol" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name={`drugsToRestock.${index}.newDrugDetails.dosage`}
-                        render={({ field }) => (<FormItem><FormLabel>Dosage (e.g., 500mg)</FormLabel><FormControl><Input placeholder="e.g., 500mg, 10ml" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        render={({ field }) => (<FormItem><FormLabel>Dosage (e.g., 500mg)</FormLabel><FormControl><Input placeholder="e.g., 500mg, 10ml" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                          <FormField control={form.control} name={`drugsToRestock.${index}.newDrugDetails.batchNumber`}
-                        render={({ field }) => (<FormItem><FormLabel>Batch Number</FormLabel><FormControl><Input placeholder="e.g., B12345" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        render={({ field }) => (<FormItem><FormLabel>Batch Number</FormLabel><FormControl><Input placeholder="e.g., B12345" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name={`drugsToRestock.${index}.newDrugDetails.dateOfManufacture`}
-                        render={({ field }) => (<FormItem><FormLabel>Manufacture Date (Optional)</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        render={({ field }) => (<FormItem><FormLabel>Manufacture Date (Optional)</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name={`drugsToRestock.${index}.newDrugDetails.dateOfExpiry`}
-                        render={({ field }) => (<FormItem><FormLabel>Expiry Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        render={({ field }) => (<FormItem><FormLabel>Expiry Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                     </div>
                      <FormField control={form.control} name={`drugsToRestock.${index}.newDrugDetails.lowStockThreshold`}
                         render={({ field }) => (<FormItem className="md:col-span-1"><FormLabel>Low Stock Threshold (Strips)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10" {...field} min="0" /></FormControl><FormMessage /></FormItem>)} />
@@ -444,5 +443,3 @@ export default function RestockForm() {
     </Card>
   );
 }
-
-

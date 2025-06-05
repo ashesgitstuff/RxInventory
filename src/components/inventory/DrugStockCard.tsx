@@ -17,7 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface GroupedDrugForCard {
   groupKey: string;
-  displayName: string;
+  displayName: string; 
   genericName: string;
   brandName?: string;
   dosage?: string;
@@ -43,13 +43,12 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
   const { displayName, totalStock, lowStockThreshold, batches } = drugGroup;
   const isLowStock = totalStock < lowStockThreshold;
   
-  // Overall progress bar: max is either double the threshold or a bit more than current stock
   const progressBarMax = lowStockThreshold > 0 ? lowStockThreshold * 2 : Math.max(20, totalStock); 
   const stockPercentage = progressBarMax > 0 ? Math.min((totalStock / progressBarMax) * 100, 100) : (totalStock > 0 ? 100 : 0);
 
-  // Find the earliest expiry date among all batches for overall card warning
   let earliestExpiryWarning: string | null = null;
   let overallExpiryStatus: 'ok' | 'soon' | 'expired' = 'ok';
+  let earliestBatch: Drug | null = null; // Initialize earliestBatch here
 
   if (batches.length > 0) {
     const sortedBatchesByExpiry = [...batches].sort((a, b) => {
@@ -58,7 +57,7 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
       return dateA - dateB;
     });
     
-    const earliestBatch = sortedBatchesByExpiry[0];
+    earliestBatch = sortedBatchesByExpiry[0];
     if (earliestBatch && earliestBatch.dateOfExpiry) {
       try {
         const expiryDate = parseISO(earliestBatch.dateOfExpiry);
@@ -86,7 +85,7 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
         overallExpiryStatus === 'expired' ? 'border-red-700 bg-red-700/10' : 
         overallExpiryStatus === 'soon' ? 'border-orange-500 bg-orange-500/10' : ''
       )}>
-      <CardHeader className="pb-2 pr-10"> {/* Added pr-10 for popover trigger space */}
+      <CardHeader className="pb-2 pr-10"> 
         <div className="flex items-start justify-between">
             <CardTitle className="text-lg font-medium font-headline flex items-center gap-2">
             <Pill className={cn("h-5 w-5 shrink-0", isLowStock ? "text-destructive" : "text-primary")} />
@@ -151,14 +150,18 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
                     let batchExpiryStatus: 'ok' | 'soon' | 'expired' = 'ok';
                     let batchDaysToExpiryText = '';
                     if (batch.dateOfExpiry) {
-                        const days = differenceInDays(parseISO(batch.dateOfExpiry), new Date());
-                        if (days < 0) { batchExpiryStatus = 'expired'; batchDaysToExpiryText = '(Expired)'; }
-                        else if (days <= 30) { batchExpiryStatus = 'soon'; batchDaysToExpiryText = `(${days}d left)`; }
-                        else if (days <= 90) { batchExpiryStatus = 'soon'; batchDaysToExpiryText = '(Expires soon)';}
+                        try {
+                            const expiry = parseISO(batch.dateOfExpiry);
+                            const days = differenceInDays(expiry, new Date());
+                            if (days < 0) { batchExpiryStatus = 'expired'; batchDaysToExpiryText = '(Expired)'; }
+                            else if (days <= 30) { batchExpiryStatus = 'soon'; batchDaysToExpiryText = `(${days}d left)`; }
+                            else if (days <= 90) { batchExpiryStatus = 'soon'; batchDaysToExpiryText = '(Expires soon)';}
+                        } catch(e) { /* ignore parse error for this display */ }
                     }
                     return (
                       <li key={batch.id} className="text-sm border-b pb-2 last:border-b-0 last:pb-0">
                         <div className="font-semibold">Batch: {batch.batchNumber || 'N/A'}</div>
+                        {batch.brandName && <div>Brand: {batch.brandName}</div>}
                         <div>Stock: <Badge variant={batch.stock < batch.lowStockThreshold ? "destructive" : "secondary"}>{batch.stock}</Badge> strips</div>
                         <div className={cn(
                             batchExpiryStatus === 'expired' ? 'text-red-600' : batchExpiryStatus === 'soon' ? 'text-orange-600' : ''
