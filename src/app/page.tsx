@@ -5,7 +5,7 @@ import { useInventory } from '@/contexts/InventoryContext';
 import DrugStockCard from '@/components/inventory/DrugStockCard';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, Loader2, RotateCcw, AlertTriangle, KeyRound } from 'lucide-react';
+import { PlusCircle, Loader2, RotateCcw, AlertTriangle, KeyRound, FileSpreadsheet } from 'lucide-react';
 import React, { useState } from 'react';
 import type { Drug } from '@/types';
 import {
@@ -19,16 +19,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Input } from '@/components/ui/input'; // Added Input import
-import { Label } from '@/components/ui/label'; // Added Label import
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import ExportDataDialog from '@/components/dashboard/ExportDataDialog';
 
-const RESET_PASSWORD = "12345"; // Define the password
+const RESET_PASSWORD = "12345"; 
 
 export default function DashboardPage() {
-  const { drugs, loading, getDrugGroupsForDisplay, resetInventoryData } = useInventory();
+  const { drugs, transactions, loading, getDrugGroupsForDisplay, resetInventoryData } = useInventory();
   const [isClient, setIsClient] = React.useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const { toast } = useToast();
@@ -49,9 +51,9 @@ export default function DashboardPage() {
         title: "Data Reset Successful",
         description: "All inventory, transactions, and villages have been reset to their default state.",
       });
-      setIsResetDialogOpen(false); // Close the dialog after reset
-      setPasswordInput(''); // Clear password input
-      setPasswordError(''); // Clear error
+      setIsResetDialogOpen(false); 
+      setPasswordInput(''); 
+      setPasswordError(''); 
     } else {
       setPasswordError("Incorrect password. Please try again.");
     }
@@ -79,7 +81,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (groupedDrugsForDashboard.length === 0) {
+  if (groupedDrugsForDashboard.length === 0 && isClient) {
     return (
       <div className="text-center py-10">
         <p className="text-xl text-muted-foreground mb-4">No drugs in inventory.</p>
@@ -145,6 +147,9 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold font-headline text-foreground">Inventory Dashboard</h1>
+        <Button variant="outline" onClick={() => setIsExportDialogOpen(true)} className="shadow-md hover:shadow-lg transition-shadow">
+          <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Data
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -198,7 +203,7 @@ export default function DashboardPage() {
                         value={passwordInput}
                         onChange={(e) => {
                             setPasswordInput(e.target.value);
-                            if (passwordError) setPasswordError(''); // Clear error on typing
+                            if (passwordError) setPasswordError(''); 
                         }}
                         placeholder="Enter password"
                         className={passwordError ? "border-destructive ring-destructive focus-visible:ring-destructive" : ""}
@@ -218,7 +223,12 @@ export default function DashboardPage() {
           Use this to clear all data and start fresh. This action is password protected.
         </p>
       </div>
+      <ExportDataDialog
+        isOpen={isExportDialogOpen}
+        onClose={() => setIsExportDialogOpen(false)}
+        allDrugs={drugs}
+        allTransactions={transactions}
+      />
     </div>
   );
 }
-

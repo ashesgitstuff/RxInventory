@@ -32,8 +32,6 @@ const dispenseFormSchema = z.object({
   patientName: z.string().min(2, { message: "Patient name must be at least 2 characters." }),
   aadharLastFour: z.string().length(4, {message: "Aadhar must be 4 digits."}).regex(/^\d{4}$/, "Must be 4 digits."),
   age: z.coerce.number().int().positive({ message: "Age must be a positive number." }),
-  sex: z.enum(['Male', 'Female', 'Other', ''], { errorMap: () => ({ message: "Please select a valid sex."}) }).refine(val => val !== '', { message: "Please select a sex."}),
-  villageName: z.string().optional(),
   drugsToDispense: z.array(drugDispenseEntrySchema).min(1, { message: "At least one drug batch must be added to dispense." }),
 });
 
@@ -52,7 +50,7 @@ export default function DispenseForm() {
       patientName: '',
       aadharLastFour: '',
       age: '' as unknown as number, 
-      sex: '', 
+      sex: undefined, // Set to undefined to match the updated schema
       villageName: '', 
       drugsToDispense: [{ selectedBatchId: '', stripsDispensed: 1 }],
     },
@@ -85,7 +83,7 @@ export default function DispenseForm() {
         patientName: '',
         aadharLastFour: '',
         age: '' as unknown as number,
-        sex: '',
+        sex: undefined,
         villageName: '',
         drugsToDispense: [{ selectedBatchId: '', stripsDispensed: 1 }],
       });
