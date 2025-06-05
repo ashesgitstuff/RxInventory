@@ -5,7 +5,7 @@ import { useInventory } from '@/contexts/InventoryContext';
 import DrugStockCard from '@/components/inventory/DrugStockCard';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, Loader2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Loader2, RotateCcw, AlertTriangle, KeyRound } from 'lucide-react';
 import React, { useState } from 'react';
 import type { Drug } from '@/types';
 import {
@@ -19,12 +19,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Input } from '@/components/ui/input'; // Added Input import
+import { Label } from '@/components/ui/label'; // Added Label import
 import { useToast } from '@/hooks/use-toast';
+
+const RESET_PASSWORD = "12345"; // Define the password
 
 export default function DashboardPage() {
   const { drugs, loading, getDrugGroupsForDisplay, resetInventoryData } = useInventory();
   const [isClient, setIsClient] = React.useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const { toast } = useToast();
 
   React.useEffect(() => {
@@ -36,14 +42,33 @@ export default function DashboardPage() {
     return getDrugGroupsForDisplay();
   }, [loading, isClient, getDrugGroupsForDisplay]);
 
-  const handleResetData = () => {
-    resetInventoryData();
-    toast({
-      title: "Data Reset Successful",
-      description: "All inventory, transactions, and villages have been reset to their default state.",
-    });
-    setIsResetDialogOpen(false); // Close the dialog after reset
+  const handleResetDataAttempt = () => {
+    if (passwordInput === RESET_PASSWORD) {
+      resetInventoryData();
+      toast({
+        title: "Data Reset Successful",
+        description: "All inventory, transactions, and villages have been reset to their default state.",
+      });
+      setIsResetDialogOpen(false); // Close the dialog after reset
+      setPasswordInput(''); // Clear password input
+      setPasswordError(''); // Clear error
+    } else {
+      setPasswordError("Incorrect password. Please try again.");
+    }
   };
+
+  const openResetDialog = () => {
+    setPasswordInput('');
+    setPasswordError('');
+    setIsResetDialogOpen(true);
+  };
+
+  const closeResetDialog = () => {
+    setIsResetDialogOpen(false);
+    setPasswordInput('');
+    setPasswordError('');
+  };
+
 
   if (!isClient || loading) {
     return (
@@ -68,7 +93,7 @@ export default function DashboardPage() {
         <div className="mt-12 pt-8 border-t border-border">
           <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="shadow-md hover:shadow-lg transition-shadow">
+              <Button variant="destructive" className="shadow-md hover:shadow-lg transition-shadow" onClick={openResetDialog}>
                 <RotateCcw className="mr-2 h-4 w-4" /> Reset All Data
               </Button>
             </AlertDialogTrigger>
@@ -81,18 +106,35 @@ export default function DashboardPage() {
                 <AlertDialogDescription>
                   This action cannot be undone. This will permanently delete all your current
                   inventory, transaction, and village data, and reset it to the application defaults.
+                  <br />
+                  <strong className="text-destructive">Please enter the password to confirm.</strong>
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              <div className="space-y-2 py-2">
+                <Label htmlFor="resetPassword">Password</Label>
+                <div className="flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="resetPassword"
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    placeholder="Enter password"
+                    className={passwordError ? "border-destructive ring-destructive" : ""}
+                  />
+                </div>
+                {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+              </div>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleResetData} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                <AlertDialogCancel onClick={closeResetDialog}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleResetDataAttempt} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
                   Yes, Reset Data
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
           <p className="text-xs text-muted-foreground mt-2">
-            Use this to clear all data and start fresh.
+            Use this to clear all data and start fresh. This action is password protected.
           </p>
         </div>
       </div>
@@ -121,9 +163,15 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-12 pt-8 border-t border-border text-center">
-        <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <AlertDialog open={isResetDialogOpen} onOpenChange={(open) => {
+            if (!open) {
+                closeResetDialog();
+            } else {
+                openResetDialog();
+            }
+        }}>
           <AlertDialogTrigger asChild>
-            <Button variant="destructive" className="shadow-md hover:shadow-lg transition-shadow">
+            <Button variant="destructive" className="shadow-md hover:shadow-lg transition-shadow" onClick={openResetDialog}>
               <RotateCcw className="mr-2 h-4 w-4" /> Reset All Data
             </Button>
           </AlertDialogTrigger>
@@ -136,20 +184,41 @@ export default function DashboardPage() {
               <AlertDialogDescription>
                 This action cannot be undone. This will permanently delete all your current
                 inventory, transaction, and village data, and reset it to the application defaults.
+                <br />
+                <strong className="text-destructive">Please enter the password to confirm.</strong>
               </AlertDialogDescription>
             </AlertDialogHeader>
+             <div className="space-y-2 py-2">
+                <Label htmlFor="resetPasswordConfirm">Password</Label>
+                 <div className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="resetPasswordConfirm"
+                        type="password"
+                        value={passwordInput}
+                        onChange={(e) => {
+                            setPasswordInput(e.target.value);
+                            if (passwordError) setPasswordError(''); // Clear error on typing
+                        }}
+                        placeholder="Enter password"
+                        className={passwordError ? "border-destructive ring-destructive focus-visible:ring-destructive" : ""}
+                    />
+                 </div>
+                {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+              </div>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleResetData} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+              <AlertDialogCancel onClick={closeResetDialog}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleResetDataAttempt} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
                 Yes, Reset Data
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
         <p className="text-xs text-muted-foreground mt-2">
-          Use this to clear all data and start fresh.
+          Use this to clear all data and start fresh. This action is password protected.
         </p>
       </div>
     </div>
   );
 }
+
