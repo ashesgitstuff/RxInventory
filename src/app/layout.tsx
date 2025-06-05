@@ -6,7 +6,7 @@ import Header from '@/components/layout/Header';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'ChotusDrugBus - Pharmacy Management',
+  title: 'FORRADS MMU - Pharmacy Management',
   description: 'Manage your rural health clinic pharmacy inventory efficiently.',
   // manifest: '/manifest.json', // Removed to let next-pwa handle it
 };

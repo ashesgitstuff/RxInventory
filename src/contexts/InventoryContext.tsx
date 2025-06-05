@@ -4,12 +4,12 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Drug, Transaction, TransactionDrugDetail, EditDrugFormData, DrugRestockEntry, Village, DispenseFormData, DrugDispenseEntry, GroupedDrugDisplay, NewDrugDetails } from '@/types';
-import { INITIAL_DRUGS, DEFAULT_PURCHASE_PRICE, DEFAULT_DRUG_LOW_STOCK_THRESHOLD } from '@/types'; // Import INITIAL_DRUGS
+import { INITIAL_DRUGS, DEFAULT_PURCHASE_PRICE, DEFAULT_DRUG_LOW_STOCK_THRESHOLD } from '@/types'; 
 import { parseISO, compareAsc, format } from 'date-fns';
 
-const DRUGS_STORAGE_KEY = 'chotusdrugbus_drugs_v3';
-const TRANSACTIONS_STORAGE_KEY = 'chotusdrugbus_transactions_v3';
-const VILLAGES_STORAGE_KEY = 'chotusdrugbus_villages';
+const DRUGS_STORAGE_KEY = 'forradsmmu_drugs_v1';
+const TRANSACTIONS_STORAGE_KEY = 'forradsmmu_transactions_v1';
+const VILLAGES_STORAGE_KEY = 'forradsmmu_villages_v1';
 
 const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
@@ -17,7 +17,7 @@ export interface BatchForDispenseDisplay {
   id: string;
   displayName: string;
   stock: number;
-  name: string; // Generic name
+  name: string; 
   brandName?: string;
   dosage?: string;
   batchNumber?: string;
@@ -183,7 +183,7 @@ const getBatchesForDispenseDisplay = useCallback((): BatchForDispenseDisplay[] =
         try {
           expiryPart = ` - Exp: ${format(parseISO(batch.dateOfExpiry), 'MM/yy')}`;
         } catch (e) {
-          expiryPart = ` - Exp: ${batch.dateOfExpiry}`; // fallback
+          expiryPart = ` - Exp: ${batch.dateOfExpiry}`; 
         }
       }
       const stockPart = ` (Stock: ${batch.stock})`;
@@ -222,11 +222,10 @@ const dispenseDrugs = async (
     const successfullyDispensedForToast: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }> = [];
     const transactionDrugDetailsForLog: TransactionDrugDetail[] = [];
     
-    // Create a deep copy of the current drugs state to work with
-    const currentDrugsStateCopy: Drug[] = JSON.parse(JSON.stringify(drugs));
+    let tempDrugsState = JSON.parse(JSON.stringify(drugs)) as Drug[];
 
     for (const request of drugsToDispenseRequest) {
-      const batchToDispenseFromIndex = currentDrugsStateCopy.findIndex(d => d.id === request.selectedBatchId);
+      const batchToDispenseFromIndex = tempDrugsState.findIndex(d => d.id === request.selectedBatchId);
       
       let stripsToDispense = request.stripsDispensed;
 
@@ -236,7 +235,7 @@ const dispenseDrugs = async (
         continue;
       }
       
-      const batchToDispenseFrom = currentDrugsStateCopy[batchToDispenseFromIndex];
+      const batchToDispenseFrom = tempDrugsState[batchToDispenseFromIndex];
       const drugIdentifierForMessage = `${batchToDispenseFrom.name} ${batchToDispenseFrom.brandName || ''} ${batchToDispenseFrom.dosage || ''} (Batch: ${batchToDispenseFrom.batchNumber || 'N/A'})`;
 
       if (stripsToDispense <= 0) {
@@ -258,7 +257,7 @@ const dispenseDrugs = async (
       }
       
       const originalStock = batchToDispenseFrom.stock;
-      batchToDispenseFrom.stock -= stripsToDispense;
+      tempDrugsState[batchToDispenseFromIndex].stock -= stripsToDispense;
 
       transactionDrugDetailsForLog.push({
         drugId: batchToDispenseFrom.id,
@@ -266,9 +265,9 @@ const dispenseDrugs = async (
         brandName: batchToDispenseFrom.brandName,
         dosage: batchToDispenseFrom.dosage,
         batchNumber: batchToDispenseFrom.batchNumber,
-        quantity: -stripsToDispense, // Negative for dispense
+        quantity: -stripsToDispense, 
         previousStock: originalStock,
-        newStock: batchToDispenseFrom.stock,
+        newStock: tempDrugsState[batchToDispenseFromIndex].stock,
       });
       successfullyDispensedForToast.push({ 
          drugName: batchToDispenseFrom.name, 
@@ -280,7 +279,7 @@ const dispenseDrugs = async (
     }
 
     if (transactionDrugDetailsForLog.length > 0) {
-        setDrugs(currentDrugsStateCopy); // Set the modified copy as the new state
+        setDrugs(tempDrugsState); 
         addTransaction({
             type: 'dispense',
             patientName: patientDetails.patientName,
@@ -312,15 +311,12 @@ const dispenseDrugs = async (
     restockedDrugs: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }>;
   }> => {
     
-    const newBatchesToAdd: Drug[] = [];
-    const updatedExistingBatches: Drug[] = [];
-    
+    let tempDrugsState = JSON.parse(JSON.stringify(drugs)) as Drug[];
+    const newBatchesCreated: Drug[] = []; // Keep track of newly created batches within this operation
     const transactionDetailsForMainLog: TransactionDrugDetail[] = [];
     const restockedDrugsInfoForReturn: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }> = [];
     const priceUpdateTransactionsToLog: Array<Omit<Transaction, 'id' | 'timestamp'>> = [];
 
-    // Create a deep copy to work with, ensuring modifications don't affect the original state prematurely
-    let workingDrugsCopy = JSON.parse(JSON.stringify(drugs)) as Drug[];
 
     for (const item of drugsToRestockItems) {
         if (item.drugId === '--add-new--' && item.newDrugDetails) {
@@ -334,7 +330,9 @@ const dispenseDrugs = async (
                 lowStockThreshold: nd.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
                 initialSource: source,
             };
-            newBatchesToAdd.push(newDrugBatch);
+            tempDrugsState.push(newDrugBatch); 
+            newBatchesCreated.push(newDrugBatch);
+
             transactionDetailsForMainLog.push({
                 drugId: newDrugBatch.id, drugName: newDrugBatch.name, brandName: newDrugBatch.brandName,
                 dosage: newDrugBatch.dosage, batchNumber: newDrugBatch.batchNumber, quantity: item.stripsAdded,
@@ -345,9 +343,9 @@ const dispenseDrugs = async (
                 batchNumber: newDrugBatch.batchNumber, quantity: item.stripsAdded 
             });
         } else {
-            const drugIndexInWorkingCopy = workingDrugsCopy.findIndex(d => d.id === item.drugId);
-            if (drugIndexInWorkingCopy !== -1) {
-                const drugToUpdate = workingDrugsCopy[drugIndexInWorkingCopy]; // This is a reference to an object in workingDrugsCopy
+            const drugIndex = tempDrugsState.findIndex(d => d.id === item.drugId);
+            if (drugIndex !== -1) {
+                const drugToUpdate = tempDrugsState[drugIndex];
                 const previousStock = drugToUpdate.stock;
                 
                 drugToUpdate.stock += item.stripsAdded;
@@ -364,7 +362,6 @@ const dispenseDrugs = async (
                         }
                     });
                 }
-                // No need to push to updatedExistingBatches explicitly if we modify workingDrugsCopy directly.
                 transactionDetailsForMainLog.push({
                     drugId: drugToUpdate.id, drugName: drugToUpdate.name, brandName: drugToUpdate.brandName,
                     dosage: drugToUpdate.dosage, batchNumber: drugToUpdate.batchNumber, quantity: item.stripsAdded,
@@ -378,8 +375,7 @@ const dispenseDrugs = async (
         }
     }
 
-    const finalDrugsState = [...workingDrugsCopy, ...newBatchesToAdd];
-    setDrugs(finalDrugsState);
+    setDrugs(tempDrugsState);
 
     if (transactionDetailsForMainLog.length > 0) {
         addTransaction({
@@ -470,7 +466,7 @@ const dispenseDrugs = async (
         try {
             expiryDateFormatted = format(parseISO(drugToDelete.dateOfExpiry), 'PP');
         } catch (e) {
-            expiryDateFormatted = drugToDelete.dateOfExpiry; // fallback to raw string if parse fails
+            expiryDateFormatted = drugToDelete.dateOfExpiry; 
         }
     }
 
@@ -526,4 +522,3 @@ export const useInventory = () => {
   }
   return context;
 };
-

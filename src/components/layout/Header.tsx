@@ -2,7 +2,8 @@
 "use client";
 
 import Link from 'next/link';
-import { Pill, LayoutGrid, MinusCircle, PackagePlus, Edit3 as EditIcon, ListChecks, Tent } from 'lucide-react'; // Added Tent
+import Image from 'next/image'; // Import next/image
+import { LayoutGrid, MinusCircle, PackagePlus, Edit3 as EditIcon, ListChecks, Tent } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutGrid },
   { href: '/manage-drugs', label: 'Manage Drugs', icon: EditIcon },
   { href: '/transactions', label: 'Transactions', icon: ListChecks },
-  { href: '/camps', label: 'Camps', icon: Tent }, // Added Camps link
+  { href: '/camps', label: 'Camps', icon: Tent },
 ];
 
 export default function Header() {
@@ -23,8 +24,15 @@ export default function Header() {
     <header className="bg-card border-b border-border shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 text-xl font-headline font-bold text-primary">
-          <Pill className="h-7 w-7" />
-          <span>ChotusDrugBus</span>
+          <Image 
+            src="https://placehold.co/120x40.png" 
+            alt="FORRADS MMU Logo" 
+            width={120} 
+            height={40} 
+            className="h-10 w-auto" // Adjust height as needed, width will scale
+            data-ai-hint="logo brand"
+          />
+          <span>FORRADS MMU</span>
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2">
           {navItems.map((item) => (
