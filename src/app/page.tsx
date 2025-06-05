@@ -9,66 +9,32 @@ import { PlusCircle, Loader2 } from 'lucide-react';
 import React from 'react';
 import type { Drug } from '@/types';
 
-interface GroupedDrug {
-  groupKey: string;
-  displayName: string; // For the card title: Brand Generic Dosage
+// This interface can be simplified or aligned with GroupedDrugDisplay from types.ts if needed
+// For now, keeping it separate as dashboard might have slightly different needs.
+interface DashboardGroupedDrug {
+  groupKey: string; // Should align with the key from getDrugGroupsForDisplay
+  displayName: string; 
   genericName: string;
   brandName?: string;
   dosage?: string;
   totalStock: number;
-  lowStockThreshold: number; // Use threshold from the first batch in group for aggregate warning
+  lowStockThreshold: number; 
   batches: Drug[];
 }
 
 export default function DashboardPage() {
-  const { drugs, loading } = useInventory(); 
+  const { drugs, loading, getDrugGroupsForDisplay } = useInventory(); 
   const [isClient, setIsClient] = React.useState(false);
 
   React.useEffect(() => {
     setIsClient(true);
   }, []);
 
-  const groupedDrugs = React.useMemo(() => {
-    if (!drugs) return [];
-    const groups: Record<string, GroupedDrug> = {};
-
-    drugs.forEach(drug => {
-      const groupKey = `${drug.name.toLowerCase()}-${(drug.brandName || '').toLowerCase()}-${(drug.dosage || '').toLowerCase()}`;
-      
-      let displayNameSegments: string[] = [];
-      if (drug.brandName) {
-        displayNameSegments.push(drug.brandName);
-      }
-      displayNameSegments.push(drug.name); // Generic name always present
-      if (drug.dosage) {
-        displayNameSegments.push(drug.dosage);
-      }
-      const displayName = displayNameSegments.join(' ');
-
-
-      if (!groups[groupKey]) {
-        groups[groupKey] = {
-          groupKey,
-          displayName,
-          genericName: drug.name,
-          brandName: drug.brandName,
-          dosage: drug.dosage,
-          totalStock: 0,
-          lowStockThreshold: drug.lowStockThreshold, // Use first batch's threshold
-          batches: [],
-        };
-      }
-      groups[groupKey].totalStock += drug.stock;
-      groups[groupKey].batches.push(drug);
-      // Sort batches by expiry date (oldest first) if needed for display, or leave as is
-      groups[groupKey].batches.sort((a, b) => {
-        const dateA = a.dateOfExpiry ? new Date(a.dateOfExpiry).getTime() : Infinity;
-        const dateB = b.dateOfExpiry ? new Date(b.dateOfExpiry).getTime() : Infinity;
-        return dateA - dateB;
-      });
-    });
-    return Object.values(groups);
-  }, [drugs]);
+  // Use getDrugGroupsForDisplay from context to ensure consistency
+  const groupedDrugsForDashboard = React.useMemo(() => {
+    if (loading || !isClient) return []; // Prevent running if not loaded or not client
+    return getDrugGroupsForDisplay(); // This now returns GroupedDrugDisplay[]
+  }, [loading, isClient, getDrugGroupsForDisplay]);
 
 
   if (!isClient || loading) {
@@ -80,7 +46,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (groupedDrugs.length === 0) {
+  if (groupedDrugsForDashboard.length === 0) {
     return (
       <div className="text-center py-10">
         <p className="text-xl text-muted-foreground mb-4">No drugs in inventory.</p>
@@ -101,7 +67,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {groupedDrugs.map((group) => (
+        {groupedDrugsForDashboard.map((group) => (
+          // DrugStockCard expects GroupedDrugDisplay which is what getDrugGroupsForDisplay returns
           <DrugStockCard key={group.groupKey} drugGroup={group} /> 
         ))}
       </div>
@@ -117,3 +84,6 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+    
