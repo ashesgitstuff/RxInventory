@@ -70,7 +70,7 @@ export default function ManageDrugsPage() {
                     <TableRow key={drug.id}>
                       <TableCell className="font-medium">{drug.name}</TableCell>
                       <TableCell className="text-right">{drug.stock}</TableCell>
-                      <TableCell className="text-right">{drug.purchasePricePerStrip.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">₹{drug.purchasePricePerStrip.toFixed(2)}</TableCell>
                       <TableCell className="text-center">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(drug)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit

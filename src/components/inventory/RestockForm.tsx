@@ -277,7 +277,7 @@ export default function RestockForm() {
                         <Input 
                             type="text" 
                             value={typeof getPurchasePricePerStripForDisplay(watchedDrugsToRestock[index]) === 'number' 
-                                ? (getPurchasePricePerStripForDisplay(watchedDrugsToRestock[index]) as number).toFixed(2) 
+                                ? `₹${(getPurchasePricePerStripForDisplay(watchedDrugsToRestock[index]) as number).toFixed(2)}` 
                                 : getPurchasePricePerStripForDisplay(watchedDrugsToRestock[index])} 
                             readOnly 
                             className="bg-muted"
