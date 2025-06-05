@@ -22,7 +22,7 @@ import { CheckCircle } from 'lucide-react';
 
 const editDrugFormSchema = z.object({
   name: z.string().min(2, { message: "Drug name must be at least 2 characters." }),
-  initialSource: z.string().optional(), // Allow empty string, or can be min(1) if required
+  initialSource: z.string().optional(),
   purchasePricePerStrip: z.coerce.number().min(0, { message: "Price must be non-negative." }),
   lowStockThreshold: z.coerce.number().int().min(0, { message: "Threshold must be zero or a positive number." }),
 });
@@ -47,8 +47,8 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
     },
   });
 
-  function onSubmit(data: EditDrugFormData) {
-    if (data.name.toLowerCase() !== drug.name.toLowerCase()) {
+  async function onSubmit(data: EditDrugFormData) {
+    if (data.name && data.name.toLowerCase() !== drug.name.toLowerCase()) {
       const existingDrugWithNewName = getDrugByName(data.name);
       if (existingDrugWithNewName && existingDrugWithNewName.id !== drug.id) {
         form.setError("name", {
@@ -59,12 +59,12 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
       }
     }
 
-    const result = updateDrugDetails(drug.id, data);
+    const result = await updateDrugDetails(drug.id, data);
 
     if (result.success) {
       toast({
-        title: "Drug Updated",
-        description: `Details for ${result.updatedDrug?.name || data.name} have been saved.`,
+        title: "Drug Updated in Firestore",
+        description: `Details for ${result.updatedDrug?.name || data.name || drug.name} have been saved to the cloud database.`,
         action: <CheckCircle className="text-green-500" />,
       });
       onSaveSuccess();

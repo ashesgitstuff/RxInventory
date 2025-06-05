@@ -49,10 +49,10 @@ const drugRestockEntrySchema = z.object({
     path: ["newDrugDetails"], 
 }).refine(data => {
     if (data.drugId === '--add-new--' && data.updatedPurchasePricePerStrip !== undefined) {
-        return false; // Cannot have updatedPurchasePricePerStrip if adding new
+        return false; 
     }
     if (data.drugId !== '--add-new--' && data.newDrugDetails) {
-        return false; // Cannot have newDrugDetails if not adding new (i.e. existing drug selected)
+        return false; 
     }
     return true;
 }, {
@@ -83,7 +83,7 @@ export default function RestockForm() {
           purchasePricePerStrip: DEFAULT_PURCHASE_PRICE, 
           lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD 
         },
-        updatedPurchasePricePerStrip: undefined // Initialize for existing drugs
+        updatedPurchasePricePerStrip: undefined 
       }],
     },
   });
@@ -106,7 +106,7 @@ export default function RestockForm() {
       if (item.drugId === '--add-new--' && item.newDrugDetails) {
         pricePerStrip = Number(item.newDrugDetails.purchasePricePerStrip) || 0;
       } else if (item.drugId !== '--add-new--') {
-        // For existing drugs, use updatedPurchasePricePerStrip if available, else drug's current price
+        
         const drug = getDrugById(item.drugId);
         pricePerStrip = item.updatedPurchasePricePerStrip !== undefined 
                         ? Number(item.updatedPurchasePricePerStrip) 
@@ -140,8 +140,8 @@ export default function RestockForm() {
   };
 
 
-  function onSubmit(data: RestockFormData) {
-    // Enhanced duplicate check for new drugs
+  async function onSubmit(data: RestockFormData) {
+    
     for (let i = 0; i < data.drugsToRestock.length; i++) {
         const item = data.drugsToRestock[i];
         if (item.drugId === '--add-new--' && item.newDrugDetails) {
@@ -160,7 +160,7 @@ export default function RestockForm() {
                     });
                     return; 
                 } else if (existingDrugWithSameName.initialSource !== data.source || existingDrugWithSameName.purchasePricePerStrip === item.newDrugDetails.purchasePricePerStrip) {
-                    // General duplicate name error if not the specific source/price conflict
+                    
                      form.setError(`drugsToRestock.${i}.newDrugDetails.name`, {
                         type: "manual",
                         message: `A drug named "${item.newDrugDetails.name}" already exists. Please use the existing drug or choose a different name.`,
@@ -176,13 +176,13 @@ export default function RestockForm() {
         }
     }
 
-    const result = restockDrugs(data.source, data.drugsToRestock);
+    const result = await restockDrugs(data.source, data.drugsToRestock);
 
     if (result.success) {
       const drugSummary = result.restockedDrugs.map(d => `${d.quantity}x ${d.drugName}`).join(', ');
       toast({
         title: "Restock Successful",
-        description: `${drugSummary} added from ${data.source}. Total cost: INR ${grandTotal.toFixed(2)}`,
+        description: `${drugSummary} added from ${data.source}. Inventory and prices updated in Firestore. Total cost: INR ${grandTotal.toFixed(2)}`,
         action: <CheckCircle className="text-green-500" />,
       });
       form.reset({
@@ -236,12 +236,10 @@ export default function RestockForm() {
     if (item.drugId === '--add-new--' && item.newDrugDetails) {
         price = item.newDrugDetails.purchasePricePerStrip;
     } else if (item.drugId !== '--add-new--') {
-        // For existing drugs, display the value from the form field if user is editing it,
-        // otherwise, the drug's current stored price.
+        
         price = item.updatedPurchasePricePerStrip; 
-        // If updatedPurchasePricePerStrip is undefined (e.g., not touched yet),
-        // it should have been pre-filled by handleDrugIdChange from drug's actual price.
-        // So, item.updatedPurchasePricePerStrip should reflect the value in the input field.
+        
+        
     }
     
     return price !== undefined ? `INR ${Number(price).toFixed(2)}` : 'N/A';
@@ -306,8 +304,8 @@ export default function RestockForm() {
                         <FormLabel>Drug</FormLabel>
                         <Select 
                             onValueChange={(value) => {
-                                field.onChange(value); // RHF internal update
-                                handleDrugIdChange(index, value); // Custom logic
+                                field.onChange(value); 
+                                handleDrugIdChange(index, value); 
                             }} 
                             defaultValue={field.value}
                         >
@@ -425,8 +423,8 @@ export default function RestockForm() {
                       },
                     updatedPurchasePricePerStrip: undefined 
                   });
-                  // Set initial state for the new field added by append
-                  const newIndex = fields.length; // append will make this the new length, so newIndex is correct
+                  
+                  const newIndex = fields.length; 
                   setFieldStates(prev => ({...prev, [newIndex]: {isNewDrug: false}}));
 
 

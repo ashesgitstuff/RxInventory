@@ -46,7 +46,7 @@ export default function DispenseForm() {
     defaultValues: {
       patientName: '',
       aadharLastFour: '',
-      age: '' as unknown as number, // Initialize with empty string for controlled input
+      age: '' as unknown as number,
       sex: '',
       drugsToDispense: [{ drugId: '', stripsDispensed: 1 }],
     },
@@ -57,26 +57,26 @@ export default function DispenseForm() {
     name: "drugsToDispense",
   });
 
-  function onSubmit(data: DispenseFormData) {
+  async function onSubmit(data: DispenseFormData) {
     const patientDetails = {
         patientName: data.patientName,
         aadharLastFour: data.aadharLastFour,
         age: data.age,
         sex: data.sex,
     };
-    const result = dispenseDrugs(patientDetails, data.drugsToDispense);
+    const result = await dispenseDrugs(patientDetails, data.drugsToDispense);
 
     if (result.success) {
       const drugSummary = result.dispensedDrugs.map(d => `${d.quantity}x ${d.drugName}`).join(', ');
       toast({
         title: "Dispense Successful",
-        description: `${drugSummary} dispensed to ${data.patientName}. ${result.message || ''}`,
+        description: `${drugSummary} dispensed to ${data.patientName}. Inventory updated in Firestore. ${result.message || ''}`,
         action: <CheckCircle className="text-green-500" />,
       });
       form.reset({
         patientName: '',
         aadharLastFour: '',
-        age: '' as unknown as number, // Reset with empty string
+        age: '' as unknown as number,
         sex: '',
         drugsToDispense: [{ drugId: '', stripsDispensed: 1 }],
       });
