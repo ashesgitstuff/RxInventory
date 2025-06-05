@@ -48,7 +48,7 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
 
   let earliestExpiryWarning: string | null = null;
   let overallExpiryStatus: 'ok' | 'soon' | 'expired' = 'ok';
-  let earliestBatch: Drug | null = null; // Initialize earliestBatch here
+  let earliestBatch: Drug | null = null; 
 
   if (batches.length > 0) {
     const sortedBatchesByExpiry = [...batches].sort((a, b) => {
@@ -77,6 +77,8 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
       } catch (e) { /* Do nothing */ }
     }
   }
+
+  const earliestExpiryDisplayDate = earliestBatch?.dateOfExpiry;
 
   return (
     <Card className={cn(
@@ -123,7 +125,7 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
             "text-muted-foreground"
           )}>
             <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-            Earliest Expiry: {formatDateSafe(batches.sort((a,b) => new Date(a.dateOfExpiry || 0).getTime() - new Date(b.dateOfExpiry || 0).getTime())[0]?.dateOfExpiry)} {earliestExpiryWarning && earliestExpiryWarning !== "Expires soon" && `(${earliestExpiryWarning})`}
+            Earliest Expiry: {formatDateSafe(earliestExpiryDisplayDate)} {earliestExpiryWarning && earliestExpiryWarning !== "Expires soon" && `(${earliestExpiryWarning})`}
           </div>
         )}
       </CardContent>
