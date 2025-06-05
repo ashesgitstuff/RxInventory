@@ -73,8 +73,7 @@ export const DEFAULT_PURCHASE_PRICE = 1;
 export const DEFAULT_DRUG_LOW_STOCK_THRESHOLD = 5;
 
 export interface DrugDispenseEntry {
-  // drugId: string; // ID of the specific batch to dispense from - CHANGED
-  selectedDrugGroupKey: string; // Key representing the drug type (e.g., "generic-brand-dosage")
+  selectedBatchId: string; // ID of the specific batch to dispense from
   stripsDispensed: number;
 }
 

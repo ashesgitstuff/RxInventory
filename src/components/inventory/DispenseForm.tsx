@@ -18,14 +18,13 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useInventory } from '@/contexts/InventoryContext';
-import type { DispenseFormData, DrugDispenseEntry, GroupedDrugDisplay } from '@/types';
+import type { DispenseFormData, DrugDispenseEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, MinusCircle, PlusCircle, Trash2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { format, parseISO } from 'date-fns';
 
 const drugDispenseEntrySchema = z.object({
-  selectedDrugGroupKey: z.string().min(1, { message: "Please select a drug type." }),
+  selectedBatchId: z.string().min(1, { message: "Please select a drug batch." }),
   stripsDispensed: z.coerce.number().int().positive({ message: "Strips must be a positive number." }),
 });
 
@@ -35,35 +34,27 @@ const dispenseFormSchema = z.object({
   age: z.coerce.number().int().positive({ message: "Age must be a positive number." }),
   sex: z.enum(['Male', 'Female', 'Other', ''], { errorMap: () => ({ message: "Please select a valid sex."}) }).refine(val => val !== '', { message: "Please select a sex."}),
   villageName: z.string().optional(),
-  drugsToDispense: z.array(drugDispenseEntrySchema).min(1, { message: "At least one drug type must be added to dispense." }),
+  drugsToDispense: z.array(drugDispenseEntrySchema).min(1, { message: "At least one drug batch must be added to dispense." }),
 });
 
-const formatDateSafeShort = (dateString?: string) => {
-  if (!dateString) return 'N/A';
-  try {
-    return format(parseISO(dateString), 'MM/yy');
-  } catch (error) {
-    return dateString;
-  }
-};
 
 export default function DispenseForm() {
-  const { getDrugGroupsForDisplay, dispenseDrugs, villages: villageList } = useInventory();
+  const { getBatchesForDispenseDisplay, dispenseDrugs, villages: villageList } = useInventory();
   const { toast } = useToast();
 
-  const availableDrugGroups = React.useMemo(() => {
-    return getDrugGroupsForDisplay().filter(group => group.totalStock > 0);
-  }, [getDrugGroupsForDisplay]);
+  const availableBatchesForDispense = React.useMemo(() => {
+    return getBatchesForDispenseDisplay();
+  }, [getBatchesForDispenseDisplay]);
 
   const form = useForm<DispenseFormData>({
     resolver: zodResolver(dispenseFormSchema),
     defaultValues: {
       patientName: '',
       aadharLastFour: '',
-      age: '' as unknown as number, // Keep this for resolver compatibility
-      sex: '', // Default to empty, placeholder will show
-      villageName: '', // Default to empty, placeholder will show
-      drugsToDispense: [{ selectedDrugGroupKey: '', stripsDispensed: 1 }],
+      age: '' as unknown as number, 
+      sex: '', 
+      villageName: '', 
+      drugsToDispense: [{ selectedBatchId: '', stripsDispensed: 1 }],
     },
   });
 
@@ -80,7 +71,7 @@ export default function DispenseForm() {
         sex: data.sex,
         villageName: data.villageName,
     };
-    // The drugsToDispense from data already contains selectedDrugGroupKey and stripsDispensed
+    
     const result = await dispenseDrugs(patientDetails, data.drugsToDispense);
 
     if (result.success) {
@@ -96,7 +87,7 @@ export default function DispenseForm() {
         age: '' as unknown as number,
         sex: '',
         villageName: '',
-        drugsToDispense: [{ selectedDrugGroupKey: '', stripsDispensed: 1 }],
+        drugsToDispense: [{ selectedBatchId: '', stripsDispensed: 1 }],
       });
     } else {
       toast({
@@ -114,7 +105,7 @@ export default function DispenseForm() {
           <MinusCircle className="h-6 w-6 text-primary" />
           Dispense Drugs
         </CardTitle>
-        <CardDescription>Enter patient and drug details to dispense medication. Drugs will be dispensed from the batch with the closest expiry date automatically.</CardDescription>
+        <CardDescription>Enter patient and drug details to dispense medication. Select the specific batch to dispense from.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -130,7 +121,7 @@ export default function DispenseForm() {
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Village / Camp Name (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}> {/* Use value for controlled component */}
+                    <Select onValueChange={field.onChange} value={field.value}> 
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select village if applicable" />
@@ -157,29 +148,29 @@ export default function DispenseForm() {
             </div>
             
             <Separator />
-            <h3 className="text-lg font-medium text-foreground">Drug Types to Dispense</h3>
+            <h3 className="text-lg font-medium text-foreground">Drug Batches to Dispense</h3>
             {fields.map((item, index) => (
               <div key={item.id} className="space-y-4 p-4 border rounded-md shadow-sm relative">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name={`drugsToDispense.${index}.selectedDrugGroupKey`}
+                    name={`drugsToDispense.${index}.selectedBatchId`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Drug Type</FormLabel>
+                        <FormLabel>Drug Batch</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select a drug type" />
+                              <SelectValue placeholder="Select a drug batch" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent className="max-h-72">
-                            {availableDrugGroups.length === 0 && 
-                              <div className="p-2 text-center text-sm text-muted-foreground">No drugs in stock</div>
+                            {availableBatchesForDispense.length === 0 && 
+                              <div className="p-2 text-center text-sm text-muted-foreground">No drug batches in stock</div>
                             }
-                            {availableDrugGroups.map((group) => (
-                              <SelectItem key={group.groupKey} value={group.groupKey}>
-                                {group.displayName} (Stock: {group.totalStock})
+                            {availableBatchesForDispense.map((batch) => (
+                              <SelectItem key={batch.id} value={batch.id}>
+                                {batch.displayName}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -209,8 +200,8 @@ export default function DispenseForm() {
                 )}
               </div>
             ))}
-            <Button type="button" variant="outline" onClick={() => append({ selectedDrugGroupKey: '', stripsDispensed: 1 })} className="w-full flex items-center gap-2">
-              <PlusCircle className="h-4 w-4" /> Add Another Drug Type
+            <Button type="button" variant="outline" onClick={() => append({ selectedBatchId: '', stripsDispensed: 1 })} className="w-full flex items-center gap-2">
+              <PlusCircle className="h-4 w-4" /> Add Another Drug Batch
             </Button>
 
             <Separator />
