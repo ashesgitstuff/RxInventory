@@ -5,12 +5,13 @@ export interface Drug {
   purchasePricePerStrip: number;
   stock: number; // in strips
   lowStockThreshold: number; // Individual threshold for this drug
+  initialSource?: string; // Source from where the drug was first added
 }
 
 export const INITIAL_DRUGS: Drug[] = [
-  { id: 'metformin-500mg', name: 'Metformin 500mg', purchasePricePerStrip: 5, stock: 50, lowStockThreshold: 10 },
-  { id: 'amlong-5mg', name: 'Amlong 5mg', purchasePricePerStrip: 10, stock: 50, lowStockThreshold: 10 },
-  { id: 'telma-40mg', name: 'Telma 40mg', purchasePricePerStrip: 15, stock: 50, lowStockThreshold: 15 },
+  { id: 'metformin-500mg', name: 'Metformin 500mg', purchasePricePerStrip: 5, stock: 50, lowStockThreshold: 10, initialSource: 'System Setup' },
+  { id: 'amlong-5mg', name: 'Amlong 5mg', purchasePricePerStrip: 10, stock: 50, lowStockThreshold: 10, initialSource: 'System Setup' },
+  { id: 'telma-40mg', name: 'Telma 40mg', purchasePricePerStrip: 15, stock: 50, lowStockThreshold: 15, initialSource: 'System Setup' },
 ];
 
 export const DEFAULT_PURCHASE_PRICE = 1; // Default purchase price for a new drug strip
@@ -87,3 +88,4 @@ export interface EditDrugFormData {
   purchasePricePerStrip: number;
   lowStockThreshold: number;
 }
+

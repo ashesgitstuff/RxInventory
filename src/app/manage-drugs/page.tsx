@@ -14,9 +14,8 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import { Edit, Edit3 } from 'lucide-react';
+import { Edit, Edit3, Info } from 'lucide-react';
 import EditDrugForm from '@/components/inventory/EditDrugForm';
-// import SettingsForm from '@/components/SettingsForm'; // Removed SettingsForm
 import {
   Dialog,
   DialogContent,
@@ -50,7 +49,7 @@ export default function ManageDrugsPage() {
             <Edit3 className="h-6 w-6 text-primary" />
             Manage Drugs
           </CardTitle>
-          <CardDescription>View and edit details of drugs in your inventory, including their low stock thresholds.</CardDescription>
+          <CardDescription>View and edit details of drugs in your inventory, including their low stock thresholds and initial source.</CardDescription>
         </CardHeader>
         <CardContent>
           {drugs.length === 0 ? (
@@ -61,6 +60,7 @@ export default function ManageDrugsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Initial Source</TableHead>
                     <TableHead className="text-right">Current Stock (Strips)</TableHead>
                     <TableHead className="text-right">Purchase Price/Strip (INR)</TableHead>
                     <TableHead className="text-right">Low Stock Threshold (Strips)</TableHead>
@@ -71,6 +71,7 @@ export default function ManageDrugsPage() {
                   {drugs.map((drug) => (
                     <TableRow key={drug.id}>
                       <TableCell className="font-medium">{drug.name}</TableCell>
+                      <TableCell>{drug.initialSource || 'N/A'}</TableCell>
                       <TableCell className="text-right">{drug.stock}</TableCell>
                       <TableCell className="text-right">INR {drug.purchasePricePerStrip.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{drug.lowStockThreshold}</TableCell>
@@ -94,7 +95,7 @@ export default function ManageDrugsPage() {
             <DialogHeader>
               <DialogTitle>Edit Drug: {selectedDrug.name}</DialogTitle>
               <DialogDescription>
-                Make changes to the drug details below. Click save when you're done.
+                Make changes to the drug details below. Click save when you're done. The initial source cannot be changed.
               </DialogDescription>
             </DialogHeader>
             <EditDrugForm
@@ -102,12 +103,13 @@ export default function ManageDrugsPage() {
               onSaveSuccess={handleSaveSuccess}
               onCancel={() => setIsEditDialogOpen(false)}
             />
+             <div className="mt-2 p-3 bg-muted/50 rounded-md text-xs text-muted-foreground flex items-start gap-2">
+                <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>The 'Initial Source' of a drug is set when it's first added to the inventory (usually during a restock of a new drug type) and cannot be modified here.</span>
+            </div>
           </DialogContent>
         </Dialog>
       )}
-
-      {/* SettingsForm removed from here as threshold is now per-drug */}
-      {/* <SettingsForm /> */}
     </div>
   );
 }

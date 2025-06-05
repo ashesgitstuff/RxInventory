@@ -9,39 +9,44 @@ import { INITIAL_DRUGS, DEFAULT_PURCHASE_PRICE, DEFAULT_DRUG_LOW_STOCK_THRESHOLD
 interface InventoryContextType {
   drugs: Drug[];
   transactions: Transaction[];
-  // lowStockThreshold: number; // Removed global threshold
   dispenseDrugs: (patientDetails: { patientName: string; aadharLastFour: string; age: number; sex: 'Male' | 'Female' | 'Other' | ''; }, drugsToDispense: Array<{ drugId: string; stripsDispensed: number }>) => { success: boolean; message?: string; dispensedDrugs: Array<{ drugName: string; quantity: number}> };
   restockDrugs: (source: string, drugsToRestock: Array<{ drugId: string; newDrugDetails?: NewDrugDetails; stripsAdded: number }>) => { success: boolean; message?: string; restockedDrugs: Array<{ drugName: string; quantity: number}> };
-  addNewDrug: (newDrugData: NewDrugDetails & { initialStock: number }) => Drug; // Signature might need adjustment if threshold is set here
+  addNewDrug: (newDrugData: NewDrugDetails & { initialStock: number }, initialSource: string) => Drug;
   updateDrugDetails: (drugId: string, data: EditDrugFormData) => { success: boolean; message?: string; updatedDrug?: Drug };
-  // updateLowStockThreshold: (newThreshold: number) => void; // Removed
   getDrugById: (drugId: string) => Drug | undefined;
   getDrugByName: (name: string) => Drug | undefined;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_DRUGS_KEY = 'rxinventory_drugs_v4'; // Incremented version due to structure change
-const LOCAL_STORAGE_TRANSACTIONS_KEY = 'rxinventory_transactions_v4'; // Incremented version
-// const LOCAL_STORAGE_THRESHOLD_KEY = 'rxinventory_threshold_v3'; // Removed
+const LOCAL_STORAGE_DRUGS_KEY = 'rxinventory_drugs_v5'; // Incremented version due to structure change (initialSource)
+const LOCAL_STORAGE_TRANSACTIONS_KEY = 'rxinventory_transactions_v4';
 
 export const InventoryProvider = ({ children }: { children: ReactNode }) => {
   const [drugs, setDrugs] = useState<Drug[]>(() => {
     if (typeof window !== 'undefined') {
       const savedDrugs = localStorage.getItem(LOCAL_STORAGE_DRUGS_KEY);
       try {
-        // Ensure drugs loaded from storage have the lowStockThreshold property
         const parsedDrugs = savedDrugs ? JSON.parse(savedDrugs) : INITIAL_DRUGS;
         return parsedDrugs.map((drug: Drug) => ({
           ...drug,
-          lowStockThreshold: drug.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD // Set default if missing
+          lowStockThreshold: drug.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
+          initialSource: drug.initialSource // Will be undefined if not present, handled at display
         }));
       } catch (error) {
         console.error("Error parsing saved drugs from localStorage:", error);
-        return INITIAL_DRUGS.map(drug => ({...drug, lowStockThreshold: drug.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD}));
+        return INITIAL_DRUGS.map(drug => ({
+            ...drug, 
+            lowStockThreshold: drug.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
+            initialSource: drug.initialSource ?? "System Setup" // Ensure initial drugs have a source
+        }));
       }
     }
-    return INITIAL_DRUGS.map(drug => ({...drug, lowStockThreshold: drug.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD}));
+    return INITIAL_DRUGS.map(drug => ({
+        ...drug, 
+        lowStockThreshold: drug.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
+        initialSource: drug.initialSource ?? "System Setup"
+    }));
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -56,8 +61,6 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
     }
     return [];
   });
-
-  // Removed global lowStockThreshold state and its localStorage effect
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -86,16 +89,14 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
     return drugs.find(drug => drug.name.toLowerCase() === name.toLowerCase());
   }, [drugs]);
 
-  // addNewDrug is primarily used by restockDrugs now when creating a new drug implicitly.
-  // It can be simplified or kept if there's a direct "add new drug" UI planned separately.
-  // For now, ensure it sets the threshold.
-  const addNewDrug = useCallback((newDrugData: NewDrugDetails & { initialStock: number }): Drug => {
+  const addNewDrug = useCallback((newDrugData: NewDrugDetails & { initialStock: number }, initialSource: string): Drug => {
     const newDrug: Drug = {
       id: newDrugData.name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
       name: newDrugData.name,
       purchasePricePerStrip: newDrugData.purchasePricePerStrip || DEFAULT_PURCHASE_PRICE,
       stock: newDrugData.initialStock,
       lowStockThreshold: newDrugData.lowStockThreshold || DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
+      initialSource: initialSource,
     };
     setDrugs((prevDrugs) => [...prevDrugs, newDrug]);
     return newDrug;
@@ -164,7 +165,7 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
 
 
   const restockDrugs = (
-    source: string,
+    source: string, // This is the source for the overall transaction
     drugsToRestock: Array<{ drugId: string; newDrugDetails?: NewDrugDetails; stripsAdded: number }>
   ): { success: boolean; message?: string; restockedDrugs: Array<{drugName: string; quantity: number}> } => {
     const transactionDrugDetails: TransactionDrugDetail[] = [];
@@ -190,6 +191,7 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
               purchasePricePerStrip: item.newDrugDetails.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE,
               stock: 0, // Will be updated below
               lowStockThreshold: item.newDrugDetails.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
+              initialSource: source, // Use the transaction source as the initial source for the new drug
             };
             tempDrugs.push(newDrug);
             drugId = newDrug.id;
@@ -211,8 +213,9 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
       tempDrugs[currentDrugIndex] = { ...tempDrugs[currentDrugIndex], stock: previousStock + item.stripsAdded };
       
       if (newDrugCreated && item.newDrugDetails) {
-        tempDrugs[currentDrugIndex].purchasePricePerStrip = item.newDrugDetails.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE;
-        tempDrugs[currentDrugIndex].lowStockThreshold = item.newDrugDetails.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD;
+        // These are already set during newDrug object creation above
+        // tempDrugs[currentDrugIndex].purchasePricePerStrip = item.newDrugDetails.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE;
+        // tempDrugs[currentDrugIndex].lowStockThreshold = item.newDrugDetails.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD;
       }
 
 
@@ -257,6 +260,7 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
       name: data.name ?? oldDrug.name,
       purchasePricePerStrip: data.purchasePricePerStrip ?? oldDrug.purchasePricePerStrip,
       lowStockThreshold: data.lowStockThreshold ?? oldDrug.lowStockThreshold,
+      // initialSource is not editable via this form, it's set at creation
     };
 
     const updatedDrugs = [...drugs];
@@ -280,8 +284,7 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
       transactionUpdateDetails.newThreshold = data.lowStockThreshold;
     }
 
-    // Only log transaction if something actually changed
-    if (Object.keys(transactionUpdateDetails).length > 2) { // drugId and drugName are always present
+    if (Object.keys(transactionUpdateDetails).length > 2) { 
         addTransaction({
             type: 'update',
             drugs: [], 
@@ -290,23 +293,18 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
         });
     }
 
-
     return { success: true, updatedDrug };
   };
-
-  // updateLowStockThreshold function removed
 
   return (
     <InventoryContext.Provider
       value={{
         drugs,
         transactions,
-        // lowStockThreshold, // Removed
         dispenseDrugs,
         restockDrugs,
         addNewDrug,
         updateDrugDetails,
-        // updateLowStockThreshold, // Removed
         getDrugById,
         getDrugByName,
       }}
@@ -323,3 +321,4 @@ export const useInventory = (): InventoryContextType => {
   }
   return context;
 };
+
