@@ -5,7 +5,7 @@ import Header from '@/components/layout/Header';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'RxInventory - Pharmacy Management',
+  title: 'ChotusDrugBus - Pharmacy Management',
   description: 'Manage your rural health clinic pharmacy inventory efficiently.',
 };
 
