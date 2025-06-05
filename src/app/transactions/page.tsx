@@ -39,8 +39,8 @@ export default function TransactionsPage() {
     if (!drugDetails || drugDetails.length === 0) return <span className="text-muted-foreground">N/A</span>;
     return (
       <ul className="list-disc list-inside space-y-1 text-sm">
-        {drugDetails.map(detail => (
-          <li key={`${detail.drugId}-${detail.batchNumber || 'nobatch'}`}> {/* Ensure unique key with batch */}
+        {drugDetails.map((detail, index) => (
+          <li key={`${detail.drugId}-${detail.batchNumber || 'nobatch'}-${index}`}> {/* Ensure unique key with index */}
             {detail.drugName} {detail.dosage ? `(${detail.dosage})` : ''} {detail.brandName ? `[${detail.brandName}]` : ''}
             {detail.batchNumber && ` (Batch: ${detail.batchNumber})`}: 
             <span className={detail.quantity > 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
@@ -161,3 +161,4 @@ export default function TransactionsPage() {
     </div>
   );
 }
+
