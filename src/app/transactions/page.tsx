@@ -14,9 +14,20 @@ import {
   TableCaption,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
-import { ListChecks, ArrowDownCircle, ArrowUpCircle, Edit3, AlertCircle, MapPin } from 'lucide-react'; // Added MapPin
+import { format, parseISO } from 'date-fns';
+import { ListChecks, ArrowDownCircle, ArrowUpCircle, Edit3, AlertCircle, MapPin } from 'lucide-react';
 import type { Transaction, TransactionDrugDetail } from '@/types';
+
+// Helper to format date strings, handling undefined or invalid dates for display
+const formatDateSafe = (dateString?: string) => {
+  if (!dateString) return 'N/A';
+  try {
+    return format(parseISO(dateString), 'PP'); // e.g., Aug 17, 2023
+  } catch (error) {
+    // If parsing fails, return the original string or a placeholder
+    return dateString; 
+  }
+};
 
 export default function TransactionsPage() {
   const { transactions } = useInventory();
@@ -29,10 +40,13 @@ export default function TransactionsPage() {
   const renderDrugDetails = (drugDetails: TransactionDrugDetail[]) => {
     if (!drugDetails || drugDetails.length === 0) return <span className="text-muted-foreground">N/A</span>;
     return (
-      <ul className="list-disc list-inside space-y-1">
+      <ul className="list-disc list-inside space-y-1 text-sm">
         {drugDetails.map(detail => (
           <li key={detail.drugId}>
-            {detail.drugName}: <span className={detail.quantity > 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>{detail.quantity > 0 ? `+${detail.quantity}` : detail.quantity}</span> strips (Prev: {detail.previousStock}, New: {detail.newStock})
+            {detail.drugName} {detail.dosage ? `(${detail.dosage})` : ''} {detail.brandName ? `[${detail.brandName}]` : ''}: 
+            <span className={detail.quantity > 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
+              {detail.quantity > 0 ? ` +${detail.quantity}` : ` ${detail.quantity}`}
+            </span> strips (Prev: {detail.previousStock}, New: {detail.newStock})
           </li>
         ))}
       </ul>
@@ -41,19 +55,27 @@ export default function TransactionsPage() {
 
   const renderUpdateDetails = (transaction: Transaction) => {
     if (transaction.type !== 'update' || !transaction.updateDetails) return null;
-    const { drugName, previousName, newName, previousPrice, newPrice, previousThreshold, newThreshold, previousSource, newSource } = transaction.updateDetails;
+    const ud = transaction.updateDetails;
     const changes = [];
-    if (newName && previousName && newName !== previousName) changes.push(`Name: "${previousName}" -> "${newName}"`);
-    else if (newName && !previousName) changes.push(`Name set to: "${newName}"`);
+
+    if (ud.newName && ud.previousName !== undefined && ud.newName !== ud.previousName) changes.push(`Generic Name: "${ud.previousName}" -> "${ud.newName}"`);
+    else if (ud.newName && ud.previousName === undefined) changes.push(`Generic Name set to: "${ud.newName}"`);
+
+    if (ud.newBrandName !== undefined && ud.newBrandName !== ud.previousBrandName) changes.push(`Brand Name: "${ud.previousBrandName || 'N/A'}" -> "${ud.newBrandName || 'N/A'}"`);
+    if (ud.newDosage !== undefined && ud.newDosage !== ud.previousDosage) changes.push(`Dosage: "${ud.previousDosage || 'N/A'}" -> "${ud.newDosage || 'N/A'}"`);
+    if (ud.newBatchNumber !== undefined && ud.newBatchNumber !== ud.previousBatchNumber) changes.push(`Batch No: "${ud.previousBatchNumber || 'N/A'}" -> "${ud.newBatchNumber || 'N/A'}"`);
     
-    if (newPrice !== undefined && previousPrice !== undefined && newPrice !== previousPrice) changes.push(`Price: INR ${previousPrice.toFixed(2)} -> INR ${newPrice.toFixed(2)}`);
-    else if (newPrice !== undefined && previousPrice === undefined) changes.push(`Price set to: INR ${newPrice.toFixed(2)}`);
+    if (ud.newDateOfManufacture !== undefined && ud.newDateOfManufacture !== ud.previousDateOfManufacture) changes.push(`Mfg. Date: ${formatDateSafe(ud.previousDateOfManufacture)} -> ${formatDateSafe(ud.newDateOfManufacture)}`);
+    if (ud.newDateOfExpiry !== undefined && ud.newDateOfExpiry !== ud.previousDateOfExpiry) changes.push(`Exp. Date: ${formatDateSafe(ud.previousDateOfExpiry)} -> ${formatDateSafe(ud.newDateOfExpiry)}`);
+    
+    if (ud.newPrice !== undefined && ud.previousPrice !== undefined && ud.newPrice !== ud.previousPrice) changes.push(`Price: INR ${ud.previousPrice.toFixed(2)} -> INR ${ud.newPrice.toFixed(2)}`);
+    else if (ud.newPrice !== undefined && ud.previousPrice === undefined) changes.push(`Price set to: INR ${ud.newPrice.toFixed(2)}`);
 
-    if (newThreshold !== undefined && previousThreshold !== undefined && newThreshold !== previousThreshold) changes.push(`Threshold: ${previousThreshold} -> ${newThreshold} strips`);
-    else if (newThreshold !== undefined && previousThreshold === undefined) changes.push(`Threshold set to: ${newThreshold} strips`);
+    if (ud.newThreshold !== undefined && ud.previousThreshold !== undefined && ud.newThreshold !== ud.previousThreshold) changes.push(`Threshold: ${ud.previousThreshold} -> ${ud.newThreshold} strips`);
+    else if (ud.newThreshold !== undefined && ud.previousThreshold === undefined) changes.push(`Threshold set to: ${ud.newThreshold} strips`);
 
-    if (newSource !== undefined && previousSource !== undefined && newSource !== previousSource) changes.push(`Source: "${previousSource}" -> "${newSource}"`);
-    else if (newSource !== undefined && previousSource === undefined) changes.push(`Source set to: "${newSource}"`);
+    if (ud.newSource !== undefined && ud.previousSource !== undefined && ud.newSource !== ud.previousSource) changes.push(`Source: "${ud.previousSource || 'N/A'}" -> "${ud.newSource || 'N/A'}"`);
+    else if (ud.newSource !== undefined && ud.previousSource === undefined) changes.push(`Source set to: "${ud.newSource || 'N/A'}"`);
 
 
     if (changes.length === 0 && !transaction.notes?.includes('details updated')) { 
@@ -61,9 +83,9 @@ export default function TransactionsPage() {
     }
 
     return (
-      <div className="text-sm">
-        <p className="font-semibold">Updated: {drugName}</p>
-        {changes.map((change, idx) => <p key={idx}><Edit3 className="inline h-3 w-3 mr-1 text-blue-500"/>{change}</p>)}
+      <div className="text-sm space-y-0.5">
+        <p className="font-semibold">Updated: {ud.drugName} {ud.newDosage ? `(${ud.newDosage})` : ''} {ud.newBrandName ? `[${ud.newBrandName}]` : ''}</p>
+        {changes.map((change, idx) => <p key={idx}><Edit3 className="inline h-3 w-3 mr-1 text-blue-500 shrink-0"/>{change}</p>)}
         {transaction.notes && !transaction.notes.startsWith('Drug details updated for') && <p className="mt-1 italic text-muted-foreground">{transaction.notes}</p>}
       </div>
     );

@@ -14,7 +14,7 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import { Edit, Edit3, Info } from 'lucide-react';
+import { Edit, Edit3, Info, Pill } from 'lucide-react'; // Added Pill
 import EditDrugForm from '@/components/inventory/EditDrugForm';
 import {
   Dialog,
@@ -25,6 +25,18 @@ import {
   DialogDescription,
   DialogClose
 } from "@/components/ui/dialog";
+import { format, parseISO } from 'date-fns';
+
+// Helper to format date strings, handling undefined or invalid dates
+const formatDateSafe = (dateString?: string) => {
+  if (!dateString) return 'N/A';
+  try {
+    return format(parseISO(dateString), 'PP'); // e.g., Aug 17, 2023
+  } catch (error) {
+    return dateString; // Return original if parsing fails
+  }
+};
+
 
 export default function ManageDrugsPage() {
   const { drugs } = useInventory();
@@ -46,10 +58,10 @@ export default function ManageDrugsPage() {
       <Card className="shadow-xl">
         <CardHeader>
           <CardTitle className="font-headline flex items-center gap-2 text-2xl">
-            <Edit3 className="h-6 w-6 text-primary" />
-            Manage Drugs
+            <Pill className="h-6 w-6 text-primary" /> {/* Changed Icon */}
+            Manage Drug Details
           </CardTitle>
-          <CardDescription>View and edit details of drugs in your inventory, including their low stock thresholds and initial source.</CardDescription>
+          <CardDescription>View and edit details of drugs in your inventory.</CardDescription>
         </CardHeader>
         <CardContent>
           {drugs.length === 0 ? (
@@ -59,7 +71,12 @@ export default function ManageDrugsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
+                    <TableHead>Generic Name</TableHead>
+                    <TableHead>Brand Name</TableHead>
+                    <TableHead>Dosage</TableHead>
+                    <TableHead>Batch No.</TableHead>
+                    <TableHead>Mfg. Date</TableHead>
+                    <TableHead>Exp. Date</TableHead>
                     <TableHead>Initial Source</TableHead>
                     <TableHead className="text-right">Current Stock (Strips)</TableHead>
                     <TableHead className="text-right">Purchase Price/Strip (INR)</TableHead>
@@ -71,6 +88,11 @@ export default function ManageDrugsPage() {
                   {drugs.map((drug) => (
                     <TableRow key={drug.id}>
                       <TableCell className="font-medium">{drug.name}</TableCell>
+                      <TableCell>{drug.brandName || 'N/A'}</TableCell>
+                      <TableCell>{drug.dosage || 'N/A'}</TableCell>
+                      <TableCell>{drug.batchNumber || 'N/A'}</TableCell>
+                      <TableCell>{formatDateSafe(drug.dateOfManufacture)}</TableCell>
+                      <TableCell>{formatDateSafe(drug.dateOfExpiry)}</TableCell>
                       <TableCell>{drug.initialSource || 'N/A'}</TableCell>
                       <TableCell className="text-right">{drug.stock}</TableCell>
                       <TableCell className="text-right">INR {drug.purchasePricePerStrip.toFixed(2)}</TableCell>
@@ -91,9 +113,9 @@ export default function ManageDrugsPage() {
 
       {selectedDrug && (
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl"> {/* Adjusted width */}
             <DialogHeader>
-              <DialogTitle>Edit Drug: {selectedDrug.name}</DialogTitle>
+              <DialogTitle>Edit Drug: {selectedDrug.name} {selectedDrug.dosage ? `(${selectedDrug.dosage})` : ''}</DialogTitle>
               <DialogDescription>
                 Make changes to the drug details below. Click save when you're done.
               </DialogDescription>
@@ -105,7 +127,7 @@ export default function ManageDrugsPage() {
             />
              <div className="mt-2 p-3 bg-muted/50 rounded-md text-xs text-muted-foreground flex items-start gap-2">
                 <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>The 'Initial Source' field indicates where the drug was first logged from. You can update this if needed.</span>
+                <span>All fields can be updated here. This will reflect across the application.</span>
             </div>
           </DialogContent>
         </Dialog>
