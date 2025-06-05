@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { InventoryProvider } from '@/contexts/InventoryContext';
@@ -33,3 +34,4 @@ export default function RootLayout({
     </html>
   );
 }
+

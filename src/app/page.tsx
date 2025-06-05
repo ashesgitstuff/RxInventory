@@ -5,15 +5,25 @@ import { useInventory } from '@/contexts/InventoryContext';
 import DrugStockCard from '@/components/inventory/DrugStockCard';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { drugs } = useInventory(); // Removed lowStockThreshold from here
+  const { drugs, loading } = useInventory(); 
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-xl text-muted-foreground">Loading inventory...</p>
+      </div>
+    );
+  }
 
   if (!drugs || drugs.length === 0) {
     return (
       <div className="text-center py-10">
         <p className="text-xl text-muted-foreground mb-4">No drugs in inventory.</p>
+        <p className="text-sm text-muted-foreground mb-6">Your inventory is currently empty. Add some stock to get started!</p>
         <Button asChild>
           <Link href="/restock">
             <PlusCircle className="mr-2 h-4 w-4" /> Add Initial Stock
@@ -46,3 +56,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
