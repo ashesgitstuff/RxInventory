@@ -6,11 +6,18 @@ import DrugStockCard from '@/components/inventory/DrugStockCard';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PlusCircle, Loader2 } from 'lucide-react';
+import React from 'react'; // Import React for useEffect and useState
 
 export default function DashboardPage() {
   const { drugs, loading } = useInventory(); 
+  const [isClient, setIsClient] = React.useState(false);
 
-  if (loading) {
+  React.useEffect(() => {
+    setIsClient(true); // Set to true after component mounts
+  }, []);
+
+
+  if (!isClient || loading) { // Also check for isClient to avoid hydration issues with localStorage access
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -56,4 +63,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

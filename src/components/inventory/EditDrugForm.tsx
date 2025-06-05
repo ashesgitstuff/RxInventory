@@ -63,8 +63,8 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
 
     if (result.success) {
       toast({
-        title: "Drug Updated in Firestore",
-        description: `Details for ${result.updatedDrug?.name || data.name || drug.name} have been saved to the cloud database.`,
+        title: "Drug Updated",
+        description: `Details for ${result.updatedDrug?.name || data.name || drug.name} have been saved locally.`,
         action: <CheckCircle className="text-green-500" />,
       });
       onSaveSuccess();

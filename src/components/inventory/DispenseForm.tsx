@@ -70,7 +70,7 @@ export default function DispenseForm() {
       const drugSummary = result.dispensedDrugs.map(d => `${d.quantity}x ${d.drugName}`).join(', ');
       toast({
         title: "Dispense Successful",
-        description: `${drugSummary} dispensed to ${data.patientName}. Inventory updated in Firestore. ${result.message || ''}`,
+        description: `${drugSummary} dispensed to ${data.patientName}. Inventory updated locally. ${result.message || ''}`,
         action: <CheckCircle className="text-green-500" />,
       });
       form.reset({

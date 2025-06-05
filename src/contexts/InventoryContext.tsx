@@ -4,37 +4,24 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Drug, Transaction, TransactionDrugDetail, NewDrugDetails, EditDrugFormData, DrugRestockEntry } from '@/types';
-import { DEFAULT_PURCHASE_PRICE, DEFAULT_DRUG_LOW_STOCK_THRESHOLD } from '@/types'; // INITIAL_DRUGS is no longer used directly for initialization
+import { DEFAULT_PURCHASE_PRICE, DEFAULT_DRUG_LOW_STOCK_THRESHOLD } from '@/types';
 
-import { db } from '@/lib/firebase';
-import {
-  collection,
-  onSnapshot,
-  addDoc,
-  doc,
-  updateDoc,
-  writeBatch,
-  query,
-  orderBy,
-  serverTimestamp,
-  Timestamp,
-  deleteDoc, 
-  getDoc,
-  getDocs,
-  setDoc,
-  FieldValue
-} from 'firebase/firestore';
+const DRUGS_STORAGE_KEY = 'chotusdrugbus_drugs';
+const TRANSACTIONS_STORAGE_KEY = 'chotusdrugbus_transactions';
+
+// Helper to generate unique IDs
+const generateId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
 interface InventoryContextType {
   drugs: Drug[];
   transactions: Transaction[];
-  loading: boolean; // To indicate when data is being fetched
+  loading: boolean;
   dispenseDrugs: (patientDetails: { patientName: string; aadharLastFour: string; age: number; sex: 'Male' | 'Female' | 'Other' | ''; }, drugsToDispense: Array<{ drugId: string; stripsDispensed: number }>) => Promise<{ success: boolean; message?: string; dispensedDrugs: Array<{ drugName: string; quantity: number}> }>;
   restockDrugs: (source: string, drugsToRestock: Array<DrugRestockEntry>) => Promise<{ success: boolean; message?: string; restockedDrugs: Array<{ drugName: string; quantity: number}> }>;
-  addNewDrug: (newDrugData: NewDrugDetails & { initialStock: number }, initialSource: string) => Promise<Drug | null>;
+  addNewDrug: (newDrugData: NewDrugDetails & { initialStock: number }, initialSource: string) => Promise<Drug | null>; // This might be better integrated into restockDrugs if adding new always implies stock.
   updateDrugDetails: (drugId: string, data: EditDrugFormData) => Promise<{ success: boolean; message?: string; updatedDrug?: Drug }>;
-  getDrugById: (drugId: string) => Drug | undefined; // This will now operate on the local state synced from Firestore
-  getDrugByName: (name: string) => Drug | undefined; // This will now operate on the local state synced from Firestore
+  getDrugById: (drugId: string) => Drug | undefined;
+  getDrugByName: (name: string) => Drug | undefined;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -44,56 +31,47 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch drugs from Firestore
+  // Load data from localStorage on initial mount
   useEffect(() => {
-    setLoading(true);
-    const q = query(collection(db, 'drugs'), orderBy('name'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const drugsData: Drug[] = [];
-      querySnapshot.forEach((doc) => {
-        drugsData.push({ id: doc.id, ...doc.data() } as Drug);
-      });
-      setDrugs(drugsData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching drugs from Firestore:", error);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Fetch transactions from Firestore
-  useEffect(() => {
-    setLoading(true);
-    const q = query(collection(db, 'transactions'), orderBy('timestamp', 'desc'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const transactionsData: Transaction[] = [];
-      querySnapshot.forEach((docSnapshot) => {
-        const data = docSnapshot.data();
-        // Convert Firestore Timestamp to ISO string
-        const timestamp = data.timestamp instanceof Timestamp ? data.timestamp.toDate().toISOString() : new Date().toISOString();
-        transactionsData.push({ 
-          id: docSnapshot.id, 
-          ...data,
-          timestamp,
-         } as Transaction);
-      });
-      setTransactions(transactionsData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching transactions from Firestore:", error);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-
-  const addTransactionToFirestore = useCallback(async (transactionData: Omit<Transaction, 'id' | 'timestamp' > & { timestamp: FieldValue }) => {
     try {
-      await addDoc(collection(db, 'transactions'), transactionData);
+      const storedDrugs = localStorage.getItem(DRUGS_STORAGE_KEY);
+      if (storedDrugs) {
+        setDrugs(JSON.parse(storedDrugs));
+      }
+      const storedTransactions = localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
+      if (storedTransactions) {
+        setTransactions(JSON.parse(storedTransactions));
+      }
     } catch (error) {
-      console.error("Error adding transaction to Firestore:", error);
+      console.error("Error loading data from localStorage:", error);
+      // Potentially set to empty arrays or default data if parsing fails
+      setDrugs([]);
+      setTransactions([]);
     }
+    setLoading(false);
+  }, []);
+
+  // Persist drugs to localStorage whenever they change
+  useEffect(() => {
+    if (!loading) { // Avoid writing initial empty state if still loading
+      localStorage.setItem(DRUGS_STORAGE_KEY, JSON.stringify(drugs));
+    }
+  }, [drugs, loading]);
+
+  // Persist transactions to localStorage whenever they change
+  useEffect(() => {
+    if (!loading) { // Avoid writing initial empty state
+      localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
+    }
+  }, [transactions, loading]);
+
+  const addTransaction = useCallback((transactionData: Omit<Transaction, 'id'>) => {
+    const newTransaction: Transaction = {
+      ...transactionData,
+      id: generateId('txn'),
+      timestamp: new Date().toISOString(),
+    };
+    setTransactions(prevTxns => [newTransaction, ...prevTxns]);
   }, []);
   
   const getDrugById = useCallback((drugId: string) => {
@@ -104,100 +82,103 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
     return drugs.find(drug => drug.name.toLowerCase() === name.toLowerCase());
   }, [drugs]);
 
+  // This function is mainly for direct addition, restock handles adding new drugs with stock.
   const addNewDrug = async (newDrugData: NewDrugDetails & { initialStock: number }, initialSource: string): Promise<Drug | null> => {
-    try {
-      const newDrugRef = doc(collection(db, 'drugs'));
-      const newDrug: Drug = {
-        id: newDrugRef.id, // Use Firestore generated ID
-        name: newDrugData.name,
-        purchasePricePerStrip: newDrugData.purchasePricePerStrip || DEFAULT_PURCHASE_PRICE,
-        stock: newDrugData.initialStock,
-        lowStockThreshold: newDrugData.lowStockThreshold || DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
-        initialSource: initialSource,
-      };
-      await setDoc(newDrugRef, newDrug);
-      // No need to call addTransaction here for drug creation itself, only for stock changes.
-      return newDrug;
-    } catch (error) {
-      console.error("Error adding new drug to Firestore:", error);
-      return null;
+    const existingDrug = getDrugByName(newDrugData.name);
+    if (existingDrug) {
+      console.error("Drug with this name already exists.");
+      return null; // Or throw an error / return a specific status
     }
+    const newDrug: Drug = {
+      id: generateId('drug'),
+      name: newDrugData.name,
+      purchasePricePerStrip: newDrugData.purchasePricePerStrip || DEFAULT_PURCHASE_PRICE,
+      stock: newDrugData.initialStock,
+      lowStockThreshold: newDrugData.lowStockThreshold || DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
+      initialSource: initialSource,
+    };
+    setDrugs(prevDrugs => [...prevDrugs, newDrug]);
+    // Optionally log a transaction for this initial stock if it's considered a "restock"
+    if (newDrugData.initialStock > 0) {
+      addTransaction({
+        type: 'restock',
+        source: initialSource,
+        drugs: [{
+          drugId: newDrug.id,
+          drugName: newDrug.name,
+          quantity: newDrug.initialStock,
+          previousStock: 0,
+          newStock: newDrug.stock,
+        }],
+        notes: 'Initial stock for new drug.',
+        timestamp: new Date().toISOString() 
+      });
+    }
+    return newDrug;
   };
 
   const dispenseDrugs = async (
     patientDetails: { patientName: string; aadharLastFour: string; age: number; sex: 'Male' | 'Female' | 'Other' | ''; },
     drugsToDispense: Array<{ drugId: string; stripsDispensed: number }>
   ): Promise<{ success: boolean; message?: string; dispensedDrugs: Array<{drugName: string; quantity: number}> }> => {
-    const batch = writeBatch(db);
     let allSuccessful = true;
     let errorMessage = '';
     const transactionDrugDetails: TransactionDrugDetail[] = [];
     const successfullyDispensedForToast: Array<{drugName: string; quantity: number}> = [];
+    
+    setDrugs(currentDrugs => {
+      const updatedDrugs = [...currentDrugs]; // Create a mutable copy
 
-    // Create a mutable copy of current drugs state for local checks
-    const currentDrugsState = [...drugs];
+      for (const item of drugsToDispense) {
+        const drugIndex = updatedDrugs.findIndex(d => d.id === item.drugId);
+        if (drugIndex === -1) {
+          allSuccessful = false;
+          errorMessage += `Drug with ID ${item.drugId} not found. `;
+          continue;
+        }
+        
+        const drug = updatedDrugs[drugIndex];
+        if (drug.stock < item.stripsDispensed) {
+          allSuccessful = false;
+          errorMessage += `Not enough ${drug.name} in stock. Available: ${drug.stock}, Requested: ${item.stripsDispensed}. `;
+          continue; 
+        }
 
-    for (const item of drugsToDispense) {
-      const drugIndex = currentDrugsState.findIndex(d => d.id === item.drugId);
-      if (drugIndex === -1) {
-        allSuccessful = false;
-        errorMessage += `Drug with ID ${item.drugId} not found in local cache. `;
-        continue;
-      }
-      
-      const drug = currentDrugsState[drugIndex];
-      if (drug.stock < item.stripsDispensed) {
-        allSuccessful = false;
-        errorMessage += `Not enough ${drug.name} in stock. Available: ${drug.stock}, Requested: ${item.stripsDispensed}. `;
-        continue; 
-      }
+        const previousStock = drug.stock;
+        const newStock = drug.stock - item.stripsDispensed;
+        
+        updatedDrugs[drugIndex] = { ...drug, stock: newStock };
+        successfullyDispensedForToast.push({drugName: drug.name, quantity: item.stripsDispensed});
 
-      const previousStock = drug.stock;
-      const newStock = drug.stock - item.stripsDispensed;
-      
-      const drugRef = doc(db, 'drugs', drug.id);
-      batch.update(drugRef, { stock: newStock });
-      
-      // Optimistically update local cache for subsequent checks in the same batch
-      currentDrugsState[drugIndex] = { ...drug, stock: newStock };
-      successfullyDispensedForToast.push({drugName: drug.name, quantity: item.stripsDispensed});
-
-      transactionDrugDetails.push({
-        drugId: drug.id,
-        drugName: drug.name,
-        quantity: -item.stripsDispensed,
-        previousStock: previousStock,
-        newStock: newStock,
-      });
-    }
-
-    if (transactionDrugDetails.length > 0) { 
-      try {
-        await batch.commit();
-        await addTransactionToFirestore({
-          type: 'dispense',
-          patientName: patientDetails.patientName,
-          aadharLastFour: patientDetails.aadharLastFour,
-          age: patientDetails.age,
-          sex: patientDetails.sex,
-          drugs: transactionDrugDetails,
-          timestamp: serverTimestamp(),
+        transactionDrugDetails.push({
+          drugId: drug.id,
+          drugName: drug.name,
+          quantity: -item.stripsDispensed,
+          previousStock: previousStock,
+          newStock: newStock,
         });
-      } catch (error) {
-        console.error("Error committing dispense batch to Firestore:", error);
-        // Potentially revert optimistic updates or re-fetch if critical
-        return { success: false, message: "Failed to save dispense to database. " + (error as Error).message, dispensedDrugs: [] };
       }
+      return updatedDrugs; // Return the modified array to update state
+    });
+
+    if (transactionDrugDetails.length > 0) {
+      addTransaction({
+        type: 'dispense',
+        patientName: patientDetails.patientName,
+        aadharLastFour: patientDetails.aadharLastFour,
+        age: patientDetails.age,
+        sex: patientDetails.sex,
+        drugs: transactionDrugDetails,
+        timestamp: new Date().toISOString()
+      });
     }
     
     if (!allSuccessful && transactionDrugDetails.length === 0) { 
         return { success: false, message: errorMessage.trim() || "Dispense operation failed for all drugs.", dispensedDrugs: [] };
     }
-    
     if (!allSuccessful && transactionDrugDetails.length > 0) { 
         return { success: true, message: `Partial dispense. Issues: ${errorMessage.trim()}`, dispensedDrugs: successfullyDispensedForToast };
     }
-
     return { success: true, dispensedDrugs: successfullyDispensedForToast };
   };
 
@@ -205,175 +186,186 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
     source: string, 
     drugsToRestock: Array<DrugRestockEntry>
   ): Promise<{ success: boolean; message?: string; restockedDrugs: Array<{drugName: string; quantity: number}> }> => {
-    const batch = writeBatch(db);
     const transactionDrugDetails: TransactionDrugDetail[] = [];
     const successfullyRestockedForToast: Array<{drugName: string; quantity: number}> = [];
-    let requiresNewTransactionForPriceUpdate = false;
-    const priceUpdateTransactionDetails: TransactionDrugDetail[] = []; // Not used for quantity, but for notes
-    let priceUpdateNotes = "";
+    const priceUpdateTransactions: Omit<Transaction, 'id' | 'timestamp'>[] = [];
 
-    for (const item of drugsToRestock) {
-      let drugId = item.drugId;
-      let drugName = '';
-      let currentDrugRef;
-      let existingDrugData: Drug | undefined;
+    setDrugs(currentDrugs => {
+      let updatedDrugs = [...currentDrugs];
 
-      if (item.drugId === '--add-new--' && item.newDrugDetails) {
-        currentDrugRef = doc(collection(db, 'drugs'));
-        drugId = currentDrugRef.id;
-        drugName = item.newDrugDetails.name;
-        const newDrugForFirestore: Omit<Drug, 'id'> = {
-          name: item.newDrugDetails.name,
-          purchasePricePerStrip: item.newDrugDetails.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE,
-          stock: 0, // Will be updated by the restock quantity
-          lowStockThreshold: item.newDrugDetails.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
-          initialSource: source, 
-        };
-        batch.set(currentDrugRef, newDrugForFirestore); // Set new drug data
-        existingDrugData = { ...newDrugForFirestore, id: drugId, stock: 0 }; // for stock calculation
-      } else {
-        currentDrugRef = doc(db, 'drugs', item.drugId);
-        // For existing drugs, we need to fetch them to get current stock and price
-        const drugDoc = await getDoc(currentDrugRef);
-        if (!drugDoc.exists()) {
-          console.error(`Restock failed: Drug with ID ${item.drugId} not found.`);
-          continue; 
+      for (const item of drugsToRestock) {
+        let drugId = item.drugId;
+        let drugName = '';
+        let existingDrugIndex = -1;
+        let previousStock = 0;
+        let oldPrice: number | undefined = undefined;
+
+        if (item.drugId === '--add-new--' && item.newDrugDetails) {
+          drugId = generateId('drug');
+          drugName = item.newDrugDetails.name;
+          const newDrug: Drug = {
+            id: drugId,
+            name: item.newDrugDetails.name,
+            purchasePricePerStrip: item.newDrugDetails.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE,
+            stock: 0, // Initial stock before this restock operation
+            lowStockThreshold: item.newDrugDetails.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
+            initialSource: source,
+          };
+          updatedDrugs.push(newDrug);
+          existingDrugIndex = updatedDrugs.length - 1;
+        } else {
+          existingDrugIndex = updatedDrugs.findIndex(d => d.id === item.drugId);
+          if (existingDrugIndex === -1) {
+            console.error(`Restock failed: Drug with ID ${item.drugId} not found.`);
+            continue; 
+          }
+          const currentDrug = updatedDrugs[existingDrugIndex];
+          drugName = currentDrug.name;
+          previousStock = currentDrug.stock;
+          oldPrice = currentDrug.purchasePricePerStrip;
+
+          if (item.updatedPurchasePricePerStrip !== undefined && currentDrug.purchasePricePerStrip !== item.updatedPurchasePricePerStrip) {
+            updatedDrugs[existingDrugIndex] = { ...currentDrug, purchasePricePerStrip: item.updatedPurchasePricePerStrip };
+             priceUpdateTransactions.push({
+                type: 'update',
+                drugs: [],
+                notes: `Purchase price updated for ${drugName} during restock from ${source}.`,
+                updateDetails: {
+                  drugId: drugId,
+                  drugName: drugName,
+                  previousPrice: oldPrice,
+                  newPrice: item.updatedPurchasePricePerStrip,
+                },
+                timestamp: new Date().toISOString() 
+             });
+          }
         }
-        existingDrugData = { id: drugDoc.id, ...drugDoc.data() } as Drug;
-        drugName = existingDrugData.name;
+        
+        const drugForStockUpdate = updatedDrugs[existingDrugIndex];
+        if (!drugForStockUpdate) continue;
 
-        if (item.updatedPurchasePricePerStrip !== undefined && existingDrugData.purchasePricePerStrip !== item.updatedPurchasePricePerStrip) {
-          const oldPrice = existingDrugData.purchasePricePerStrip;
-          batch.update(currentDrugRef, { purchasePricePerStrip: item.updatedPurchasePricePerStrip });
-          requiresNewTransactionForPriceUpdate = true;
-          priceUpdateNotes += `Price for ${drugName} updated from INR ${oldPrice.toFixed(2)} to INR ${item.updatedPurchasePricePerStrip.toFixed(2)}. `;
-          // Update local for transaction log
-          existingDrugData.purchasePricePerStrip = item.updatedPurchasePricePerStrip; 
-           await addTransactionToFirestore({ // Log price update separately
-            type: 'update',
-            drugs: [], 
-            notes: `Purchase price updated for ${drugName} during restock from ${source}.`,
-            updateDetails: {
-              drugId: drugId,
-              drugName: drugName,
-              previousPrice: oldPrice,
-              newPrice: item.updatedPurchasePricePerStrip,
-            },
-            timestamp: serverTimestamp()
-          });
-        }
+        previousStock = drugForStockUpdate.stock; // update previousStock in case it's a new drug
+        const newStock = drugForStockUpdate.stock + item.stripsAdded;
+        updatedDrugs[existingDrugIndex] = { ...drugForStockUpdate, stock: newStock };
+        
+        successfullyRestockedForToast.push({drugName: drugName, quantity: item.stripsAdded});
+        
+        transactionDrugDetails.push({
+          drugId: drugId,
+          drugName: drugName,
+          quantity: item.stripsAdded,
+          previousStock: previousStock,
+          newStock: newStock,
+        });
       }
-      
-      if (!existingDrugData) continue; // Should not happen if logic is correct
-
-      const previousStock = existingDrugData.stock;
-      const newStock = previousStock + item.stripsAdded;
-      batch.update(currentDrugRef, { stock: newStock });
-      
-      successfullyRestockedForToast.push({drugName: drugName, quantity: item.stripsAdded});
-      
-      transactionDrugDetails.push({
-        drugId: drugId,
-        drugName: drugName,
-        quantity: item.stripsAdded,
-        previousStock: previousStock,
-        newStock: newStock,
-      });
-    }
+      return updatedDrugs;
+    });
 
     if (transactionDrugDetails.length > 0) {
-      try {
-        await batch.commit();
-        await addTransactionToFirestore({
-          type: 'restock',
-          source: source,
-          drugs: transactionDrugDetails,
-          timestamp: serverTimestamp(),
-        });
-        return { success: true, restockedDrugs: successfullyRestockedForToast };
-      } catch (error) {
-         console.error("Error committing restock batch to Firestore:", error);
-         return { success: false, message: "Failed to save restock to database. " + (error as Error).message, restockedDrugs: [] };
-      }
+      addTransaction({
+        type: 'restock',
+        source: source,
+        drugs: transactionDrugDetails,
+        timestamp: new Date().toISOString(),
+      });
     }
-    return { success: false, message: "No drugs were restocked.", restockedDrugs: [] };
+    priceUpdateTransactions.forEach(tx => addTransaction(tx));
+
+
+    if (transactionDrugDetails.length === 0) {
+        return { success: false, message: "No drugs were restocked.", restockedDrugs: [] };
+    }
+    return { success: true, restockedDrugs: successfullyRestockedForToast };
   };
 
   const updateDrugDetails = async (drugId: string, data: EditDrugFormData): Promise<{ success: boolean; message?: string; updatedDrug?: Drug }> => {
-    const drugRef = doc(db, 'drugs', drugId);
-    try {
-      const drugSnap = await getDoc(drugRef);
-      if (!drugSnap.exists()) {
-        return { success: false, message: "Drug not found." };
-      }
-      const oldDrug = {id: drugSnap.id, ...drugSnap.data()} as Drug;
+    let updatedDrug: Drug | undefined = undefined;
+    let detailsChanged = false;
+    let transactionUpdateDetails: Transaction['updateDetails'] = { drugId: '', drugName: '' }; // Initialized
 
+    setDrugs(currentDrugs => {
+        const drugIndex = currentDrugs.findIndex(d => d.id === drugId);
+        if (drugIndex === -1) {
+            return currentDrugs; // Or handle error
+        }
+        const oldDrug = currentDrugs[drugIndex];
+        transactionUpdateDetails.drugId = drugId;
+        transactionUpdateDetails.drugName = data.name ?? oldDrug.name;
+
+
+        const updates: Partial<Drug> = {};
+        if (data.name && data.name.toLowerCase() !== oldDrug.name.toLowerCase()) {
+          const existingDrugWithNewName = currentDrugs.find(d => d.name.toLowerCase() === data.name!.toLowerCase() && d.id !== drugId);
+          if (existingDrugWithNewName) {
+            // This error should ideally be handled before calling context, or context returns specific error
+            console.error(`A drug named "${data.name}" already exists.`);
+            // To prevent state update, we'd need a more complex return or pre-check
+            return currentDrugs; 
+          }
+          updates.name = data.name;
+          transactionUpdateDetails.previousName = oldDrug.name;
+          transactionUpdateDetails.newName = data.name;
+          detailsChanged = true;
+        }
+        if (data.purchasePricePerStrip !== undefined && data.purchasePricePerStrip !== oldDrug.purchasePricePerStrip) {
+          updates.purchasePricePerStrip = data.purchasePricePerStrip;
+          transactionUpdateDetails.previousPrice = oldDrug.purchasePricePerStrip;
+          transactionUpdateDetails.newPrice = data.purchasePricePerStrip;
+          detailsChanged = true;
+        }
+        if (data.lowStockThreshold !== undefined && data.lowStockThreshold !== oldDrug.lowStockThreshold) {
+          updates.lowStockThreshold = data.lowStockThreshold;
+          transactionUpdateDetails.previousThreshold = oldDrug.lowStockThreshold;
+          transactionUpdateDetails.newThreshold = data.lowStockThreshold;
+          detailsChanged = true;
+        }
+        if (data.initialSource !== undefined && data.initialSource !== oldDrug.initialSource) {
+          updates.initialSource = data.initialSource;
+          transactionUpdateDetails.previousSource = oldDrug.initialSource;
+          transactionUpdateDetails.newSource = data.initialSource;
+          detailsChanged = true;
+        }
+
+        if (Object.keys(updates).length > 0) {
+            const newDrugsArray = [...currentDrugs];
+            updatedDrug = { ...oldDrug, ...updates };
+            newDrugsArray[drugIndex] = updatedDrug;
+            return newDrugsArray;
+        }
+        updatedDrug = oldDrug; // No changes made
+        return currentDrugs;
+    });
+    
+    if (!updatedDrug && !detailsChanged) { // If drug not found or no valid changes proposed to trigger setDrugs
+      const oldDrug = getDrugById(drugId);
+      if (!oldDrug) return { success: false, message: "Drug not found." };
+      // Check for name conflict if only name is being changed and it conflicts
       if (data.name && data.name.toLowerCase() !== oldDrug.name.toLowerCase()) {
-        // Check if new name conflicts with another existing drug
-        const q = query(collection(db, 'drugs'));
-        const querySnapshot = await getDocs(q);
-        const existingDrugWithNewName = querySnapshot.docs
-          .map(d => ({ id: d.id, ...d.data() } as Drug))
-          .find(d => d.name.toLowerCase() === data.name!.toLowerCase() && d.id !== drugId);
-        
-        if (existingDrugWithNewName) { 
+        const existingDrugWithNewName = getDrugByName(data.name);
+        if (existingDrugWithNewName && existingDrugWithNewName.id !== drugId) {
           return { success: false, message: `A drug named "${data.name}" already exists.` };
         }
       }
-      
-      const updates: Partial<Drug> = {};
-      let detailsChanged = false;
-      const transactionUpdateDetails: Transaction['updateDetails'] = {
-        drugId: drugId,
-        drugName: data.name ?? oldDrug.name,
-      };
-
-      if (data.name && data.name !== oldDrug.name) {
-        updates.name = data.name;
-        transactionUpdateDetails.previousName = oldDrug.name;
-        transactionUpdateDetails.newName = data.name;
-        detailsChanged = true;
-      }
-      if (data.purchasePricePerStrip !== undefined && data.purchasePricePerStrip !== oldDrug.purchasePricePerStrip) {
-        updates.purchasePricePerStrip = data.purchasePricePerStrip;
-        transactionUpdateDetails.previousPrice = oldDrug.purchasePricePerStrip;
-        transactionUpdateDetails.newPrice = data.purchasePricePerStrip;
-        detailsChanged = true;
-      }
-      if (data.lowStockThreshold !== undefined && data.lowStockThreshold !== oldDrug.lowStockThreshold) {
-        updates.lowStockThreshold = data.lowStockThreshold;
-        transactionUpdateDetails.previousThreshold = oldDrug.lowStockThreshold;
-        transactionUpdateDetails.newThreshold = data.lowStockThreshold;
-        detailsChanged = true;
-      }
-      if (data.initialSource !== undefined && data.initialSource !== oldDrug.initialSource) {
-        updates.initialSource = data.initialSource;
-        transactionUpdateDetails.previousSource = oldDrug.initialSource;
-        transactionUpdateDetails.newSource = data.initialSource;
-        detailsChanged = true;
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await updateDoc(drugRef, updates);
-      }
-      
-      const updatedDrugData = { ...oldDrug, ...updates };
-
-      if (detailsChanged) { 
-          await addTransactionToFirestore({
-              type: 'update',
-              drugs: [], 
-              notes: `Drug details updated for ${oldDrug.name}.`,
-              updateDetails: transactionUpdateDetails,
-              timestamp: serverTimestamp(),
-          });
-      }
-
-      return { success: true, updatedDrug: updatedDrugData };
-    } catch (error) {
-      console.error("Error updating drug details in Firestore:", error);
-      return { success: false, message: "Failed to update drug details. " + (error as Error).message };
+      // If no actual updates are valid (e.g. only name change but it conflicts)
+      // this path might be taken.
+       return { success: false, message: "No valid changes applied or drug not found." };
     }
+
+
+    if (detailsChanged && updatedDrug) { 
+        addTransaction({
+            type: 'update',
+            drugs: [], 
+            notes: `Drug details updated for ${transactionUpdateDetails.previousName || updatedDrug.name}.`,
+            updateDetails: transactionUpdateDetails,
+            timestamp: new Date().toISOString(),
+        });
+        return { success: true, updatedDrug };
+    } else if (updatedDrug) { // No details changed, but drug exists
+        return { success: true, updatedDrug }; // Success, but no transaction logged
+    }
+    // Fallback if something went wrong with state update logic for updatedDrug
+    return { success: false, message: "Failed to apply updates." };
   };
 
   return (
@@ -402,4 +394,3 @@ export const useInventory = (): InventoryContextType => {
   }
   return context;
 };
-

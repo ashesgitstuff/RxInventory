@@ -105,8 +105,7 @@ export default function RestockForm() {
       let pricePerStrip = 0;
       if (item.drugId === '--add-new--' && item.newDrugDetails) {
         pricePerStrip = Number(item.newDrugDetails.purchasePricePerStrip) || 0;
-      } else if (item.drugId !== '--add-new--' && item.drugId !== '') { // Added item.drugId !== '' for existing drug check
-        
+      } else if (item.drugId !== '--add-new--' && item.drugId !== '') { 
         const drug = getDrugById(item.drugId);
         pricePerStrip = item.updatedPurchasePricePerStrip !== undefined 
                         ? Number(item.updatedPurchasePricePerStrip) 
@@ -129,7 +128,7 @@ export default function RestockForm() {
             purchasePricePerStrip: DEFAULT_PURCHASE_PRICE, 
             lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD 
         });
-        form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerStrip`, undefined);
+        form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerStrip`, undefined); // Ensure this is undefined for new drugs
     } else {
         form.setValue(`drugsToRestock.${index}.newDrugDetails`, undefined);
         const selectedDrug = getDrugById(value);
@@ -147,6 +146,8 @@ export default function RestockForm() {
         if (item.drugId === '--add-new--' && item.newDrugDetails) {
             const existingDrugWithSameName = getDrugByName(item.newDrugDetails.name);
             if (existingDrugWithSameName) {
+                // Simplified check: if a drug with the same name exists, it's a conflict for new entries.
+                // The more complex source/price check might be too nuanced for fully offline localStorage.
                 if (existingDrugWithSameName.initialSource === data.source &&
                     existingDrugWithSameName.purchasePricePerStrip !== item.newDrugDetails.purchasePricePerStrip) {
                     form.setError(`drugsToRestock.${i}.newDrugDetails.name`, {
@@ -160,7 +161,6 @@ export default function RestockForm() {
                     });
                     return; 
                 } else if (existingDrugWithSameName.initialSource !== data.source || existingDrugWithSameName.purchasePricePerStrip === item.newDrugDetails.purchasePricePerStrip) {
-                    
                      form.setError(`drugsToRestock.${i}.newDrugDetails.name`, {
                         type: "manual",
                         message: `A drug named "${item.newDrugDetails.name}" already exists. Please use the existing drug or choose a different name.`,
@@ -182,7 +182,7 @@ export default function RestockForm() {
       const drugSummary = result.restockedDrugs.map(d => `${d.quantity}x ${d.drugName}`).join(', ');
       toast({
         title: "Drugs Added to Stock",
-        description: `${drugSummary} successfully added from ${data.source}. Inventory in Firestore is updated. Total cost: INR ${grandTotal.toFixed(2)}.`,
+        description: `${drugSummary} successfully added from ${data.source}. Inventory updated locally. Total cost: INR ${grandTotal.toFixed(2)}.`,
         action: <CheckCircle className="text-green-500" />,
       });
       form.reset({
@@ -282,7 +282,6 @@ export default function RestockForm() {
                         onClick={() => {
                             const currentFields = form.getValues("drugsToRestock");
                             remove(index);
-                            // Adjust fieldStates after removing an item
                             const newFieldStates: Record<number, { isNewDrug: boolean }> = {};
                             let newIdx = 0;
                             for (let i = 0; i < currentFields.length; i++) {
@@ -371,7 +370,7 @@ export default function RestockForm() {
                                       {...field} 
                                       min="0" 
                                       step="0.01" 
-                                      value={field.value === undefined ? '' : field.value} // Handle undefined for controlled input
+                                      value={field.value === undefined ? '' : field.value}
                                       onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
                                     />
                                 </FormControl>
@@ -437,7 +436,6 @@ export default function RestockForm() {
                       },
                     updatedPurchasePricePerStrip: DEFAULT_PURCHASE_PRICE 
                   });
-                  
                   setFieldStates(prev => ({...prev, [newIndex]: {isNewDrug: false}}));
                 }}
               className="w-full flex items-center gap-2"
@@ -458,4 +456,3 @@ export default function RestockForm() {
     </Card>
   );
 }
-

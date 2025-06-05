@@ -1,6 +1,4 @@
 
-import type { Timestamp, FieldValue } from 'firebase/firestore';
-
 export interface Drug {
   id: string;
   name: string;
@@ -10,9 +8,9 @@ export interface Drug {
   initialSource?: string; // Source from where the drug was first added
 }
 
-// INITIAL_DRUGS is no longer the primary source of data. 
-// It can be used for manual seeding or reference but the app will pull from Firestore.
 export const INITIAL_DRUGS: Drug[] = [
+  // This list is now primarily for reference or if you want to implement a "reset to defaults"
+  // It's no longer used for initial data population if localStorage has data.
   { id: 'metformin-500mg', name: 'Metformin 500mg', purchasePricePerStrip: 5, stock: 50, lowStockThreshold: 10, initialSource: 'System Setup' },
   { id: 'amlong-5mg', name: 'Amlong 5mg', purchasePricePerStrip: 10, stock: 50, lowStockThreshold: 10, initialSource: 'System Setup' },
   { id: 'telma-40mg', name: 'Telma 40mg', purchasePricePerStrip: 15, stock: 50, lowStockThreshold: 15, initialSource: 'System Setup' },
@@ -65,7 +63,7 @@ export interface TransactionDrugDetail {
 export interface Transaction {
   id: string;
   type: 'dispense' | 'restock' | 'update';
-  timestamp: string | Timestamp | FieldValue; // Firestore serverTimestamp is FieldValue, becomes Timestamp, then string
+  timestamp: string; // ISO string format
   patientName?: string;
   aadharLastFour?: string;
   age?: number;
@@ -93,4 +91,3 @@ export interface EditDrugFormData {
   lowStockThreshold?: number;
   initialSource?: string;
 }
-
