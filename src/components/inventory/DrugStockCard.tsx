@@ -4,95 +4,180 @@
 import type { Drug } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, Pill, CalendarClock } from 'lucide-react'; // Added CalendarClock
+import { AlertTriangle, Pill, CalendarClock, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays } from 'date-fns';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-interface DrugStockCardProps {
-  drug: Drug;
+interface GroupedDrugForCard {
+  groupKey: string;
+  displayName: string;
+  genericName: string;
+  brandName?: string;
+  dosage?: string;
+  totalStock: number;
+  lowStockThreshold: number; 
+  batches: Drug[];
 }
 
-// Helper to format date strings for display, e.g., Aug 2023
-const formatExpirySafe = (dateString?: string) => {
-  if (!dateString) return null;
+interface DrugStockCardProps {
+  drugGroup: GroupedDrugForCard;
+}
+
+const formatDateSafe = (dateString?: string, dateFormat: string = 'MMM yyyy') => {
+  if (!dateString) return 'N/A';
   try {
-    return format(parseISO(dateString), 'MMM yyyy');
+    return format(parseISO(dateString), dateFormat);
   } catch (error) {
-    return dateString; // Return original if parsing fails
+    return dateString; 
   }
 };
 
-export default function DrugStockCard({ drug }: DrugStockCardProps) {
-  const isLowStock = drug.stock < drug.lowStockThreshold;
-  const progressBarMax = drug.lowStockThreshold > 0 ? drug.lowStockThreshold * 2 : Math.max(20, drug.stock); 
-  const stockPercentage = progressBarMax > 0 ? Math.min((drug.stock / progressBarMax) * 100, 100) : (drug.stock > 0 ? 100 : 0) ;
+export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
+  const { displayName, totalStock, lowStockThreshold, batches } = drugGroup;
+  const isLowStock = totalStock < lowStockThreshold;
+  
+  // Overall progress bar: max is either double the threshold or a bit more than current stock
+  const progressBarMax = lowStockThreshold > 0 ? lowStockThreshold * 2 : Math.max(20, totalStock); 
+  const stockPercentage = progressBarMax > 0 ? Math.min((totalStock / progressBarMax) * 100, 100) : (totalStock > 0 ? 100 : 0);
 
-  const formattedExpiry = formatExpirySafe(drug.dateOfExpiry);
-  let expiryWarning: string | null = null;
-  if (drug.dateOfExpiry) {
-    try {
-      const expiryDate = parseISO(drug.dateOfExpiry);
-      const today = new Date();
-      const daysToExpiry = differenceInDays(expiryDate, today);
+  // Find the earliest expiry date among all batches for overall card warning
+  let earliestExpiryWarning: string | null = null;
+  let overallExpiryStatus: 'ok' | 'soon' | 'expired' = 'ok';
 
-      if (daysToExpiry < 0) {
-        expiryWarning = "Expired";
-      } else if (daysToExpiry <= 30) {
-        expiryWarning = `Expires in ${daysToExpiry}d`;
-      } else if (daysToExpiry <= 90) {
-        expiryWarning = `Expires soon`;
-      }
-    } catch (e) { /* Do nothing if date is invalid */ }
+  if (batches.length > 0) {
+    const sortedBatchesByExpiry = [...batches].sort((a, b) => {
+      const dateA = a.dateOfExpiry ? new Date(a.dateOfExpiry).getTime() : Infinity;
+      const dateB = b.dateOfExpiry ? new Date(b.dateOfExpiry).getTime() : Infinity;
+      return dateA - dateB;
+    });
+    
+    const earliestBatch = sortedBatchesByExpiry[0];
+    if (earliestBatch && earliestBatch.dateOfExpiry) {
+      try {
+        const expiryDate = parseISO(earliestBatch.dateOfExpiry);
+        const today = new Date();
+        const daysToExpiry = differenceInDays(expiryDate, today);
+
+        if (daysToExpiry < 0) {
+          earliestExpiryWarning = "Expired";
+          overallExpiryStatus = 'expired';
+        } else if (daysToExpiry <= 30) {
+          earliestExpiryWarning = `Expires in ${daysToExpiry}d`;
+          overallExpiryStatus = 'soon';
+        } else if (daysToExpiry <= 90) {
+          earliestExpiryWarning = `Expires soon`;
+          overallExpiryStatus = 'soon';
+        }
+      } catch (e) { /* Do nothing */ }
+    }
   }
-
 
   return (
     <Card className={cn(
-        "transition-all duration-300 shadow-lg hover:shadow-xl", 
+        "transition-all duration-300 shadow-lg hover:shadow-xl relative", 
         isLowStock ? 'border-destructive bg-destructive/10' : 'border-border',
-        expiryWarning === "Expired" ? 'border-red-700 bg-red-700/10' : 
-        expiryWarning && expiryWarning.includes('Expires in') ? 'border-orange-500 bg-orange-500/10' : ''
+        overallExpiryStatus === 'expired' ? 'border-red-700 bg-red-700/10' : 
+        overallExpiryStatus === 'soon' ? 'border-orange-500 bg-orange-500/10' : ''
       )}>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 pr-10"> {/* Added pr-10 for popover trigger space */}
         <div className="flex items-start justify-between">
             <CardTitle className="text-lg font-medium font-headline flex items-center gap-2">
             <Pill className={cn("h-5 w-5 shrink-0", isLowStock ? "text-destructive" : "text-primary")} />
             <div>
-                <div>{drug.name} {drug.dosage ? `(${drug.dosage})` : ''}</div>
-                {drug.brandName && <div className="text-xs text-muted-foreground font-normal">{drug.brandName}</div>}
+                <div>{displayName}</div>
             </div>
             </CardTitle>
             {isLowStock && <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />}
         </div>
-        {drug.batchNumber && <CardDescription className="text-xs pt-1">Batch: {drug.batchNumber}</CardDescription>}
+        <CardDescription className="text-xs pt-1">
+          {batches.length} batch(es) available.
+          {batches.length > 0 && earliestBatch && earliestBatch.batchNumber && ` Earliest Batch: ${earliestBatch.batchNumber}`}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold text-foreground">{drug.stock} strips</div>
+        <div className="text-3xl font-bold text-foreground">{totalStock} strips</div>
         <p className="text-xs text-muted-foreground">
-          {isLowStock ? `Stock is low (Threshold: ${drug.lowStockThreshold})` : `Threshold: ${drug.lowStockThreshold} strips`}
+          {isLowStock ? `Stock is low (Threshold: ${lowStockThreshold})` : `Threshold: ${lowStockThreshold} strips`}
         </p>
         <Progress 
           value={stockPercentage} 
           className="mt-4 h-2" 
           indicatorClassName={cn(
             isLowStock ? 'bg-destructive' : 
-            expiryWarning === "Expired" ? 'bg-red-700' : 
-            expiryWarning && expiryWarning.includes('Expires in') ? 'bg-orange-500' : 
+            overallExpiryStatus === 'expired' ? 'bg-red-700' : 
+            overallExpiryStatus === 'soon' ? 'bg-orange-500' : 
             'bg-primary'
           )}
         />
-        {formattedExpiry && (
+        {earliestExpiryWarning && (
           <div className={cn(
             "mt-2 text-xs flex items-center gap-1",
-            expiryWarning === "Expired" ? "text-red-700 font-semibold" : 
-            expiryWarning && expiryWarning.includes('Expires in') ? "text-orange-600 font-semibold" : 
+            overallExpiryStatus === "expired" ? "text-red-700 font-semibold" : 
+            overallExpiryStatus === "soon" ? "text-orange-600 font-semibold" : 
             "text-muted-foreground"
           )}>
             <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-            Exp: {formattedExpiry} {expiryWarning && expiryWarning !== "Expires soon" && `(${expiryWarning})`}
+            Earliest Expiry: {formatDateSafe(batches.sort((a,b) => new Date(a.dateOfExpiry || 0).getTime() - new Date(b.dateOfExpiry || 0).getTime())[0]?.dateOfExpiry)} {earliestExpiryWarning && earliestExpiryWarning !== "Expires soon" && `(${earliestExpiryWarning})`}
           </div>
         )}
       </CardContent>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-primary">
+            <Info className="h-4 w-4" />
+            <span className="sr-only">View Batch Details</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 max-h-96" side="left" align="end">
+          <ScrollArea className="max-h-80">
+            <div className="grid gap-4 p-1">
+              <div className="space-y-2">
+                <h4 className="font-medium leading-none">{displayName} - Batch Details</h4>
+                <p className="text-sm text-muted-foreground">
+                  Total stock: {totalStock} strips across {batches.length} batch(es).
+                </p>
+              </div>
+              {batches.length > 0 ? (
+                <ul className="space-y-3">
+                  {batches.map(batch => {
+                    let batchExpiryStatus: 'ok' | 'soon' | 'expired' = 'ok';
+                    let batchDaysToExpiryText = '';
+                    if (batch.dateOfExpiry) {
+                        const days = differenceInDays(parseISO(batch.dateOfExpiry), new Date());
+                        if (days < 0) { batchExpiryStatus = 'expired'; batchDaysToExpiryText = '(Expired)'; }
+                        else if (days <= 30) { batchExpiryStatus = 'soon'; batchDaysToExpiryText = `(${days}d left)`; }
+                        else if (days <= 90) { batchExpiryStatus = 'soon'; batchDaysToExpiryText = '(Expires soon)';}
+                    }
+                    return (
+                      <li key={batch.id} className="text-sm border-b pb-2 last:border-b-0 last:pb-0">
+                        <div className="font-semibold">Batch: {batch.batchNumber || 'N/A'}</div>
+                        <div>Stock: <Badge variant={batch.stock < batch.lowStockThreshold ? "destructive" : "secondary"}>{batch.stock}</Badge> strips</div>
+                        <div className={cn(
+                            batchExpiryStatus === 'expired' ? 'text-red-600' : batchExpiryStatus === 'soon' ? 'text-orange-600' : ''
+                        )}>
+                            Exp: {formatDateSafe(batch.dateOfExpiry, 'PP')} {batchDaysToExpiryText}
+                        </div>
+                        <div>Mfg: {formatDateSafe(batch.dateOfManufacture, 'PP')}</div>
+                        <div>Price/Strip: INR {batch.purchasePricePerStrip.toFixed(2)}</div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">No specific batch information available.</p>
+              )}
+            </div>
+          </ScrollArea>
+        </PopoverContent>
+      </Popover>
     </Card>
   );
 }

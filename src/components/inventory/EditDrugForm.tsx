@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useInventory } from '@/contexts/InventoryContext';
-import type { Drug, EditDrugFormData } from '@/types';
+import type { Drug, EditDrugFormData } from '@/types'; // Drug is a specific batch here
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle } from 'lucide-react';
 
@@ -24,15 +24,14 @@ const editDrugFormSchema = z.object({
   name: z.string().min(2, { message: "Generic name must be at least 2 characters." }),
   brandName: z.string().optional(),
   dosage: z.string().optional(),
-  batchNumber: z.string().optional(),
+  batchNumber: z.string().min(1, { message: "Batch number is required." }),
   dateOfManufacture: z.string().optional().refine(val => !val || !isNaN(Date.parse(val)), { message: "Invalid manufacture date" }),
-  dateOfExpiry: z.string().optional().refine(val => !val || !isNaN(Date.parse(val)), { message: "Invalid expiry date" }),
+  dateOfExpiry: z.string().min(1, { message: "Expiry date is required." }).refine(val => !val || !isNaN(Date.parse(val)), { message: "Invalid expiry date" }),
   initialSource: z.string().optional(),
   purchasePricePerStrip: z.coerce.number().min(0, { message: "Price must be non-negative." }),
   lowStockThreshold: z.coerce.number().int().min(0, { message: "Threshold must be zero or a positive number." }),
 }).refine(data => {
     if (data.dateOfManufacture && data.dateOfExpiry) {
-        // Ensure dates are valid before comparing
         const mfgDate = new Date(data.dateOfManufacture);
         const expDate = new Date(data.dateOfExpiry);
         if (!isNaN(mfgDate.getTime()) && !isNaN(expDate.getTime())) {
@@ -44,48 +43,59 @@ const editDrugFormSchema = z.object({
 
 
 interface EditDrugFormProps {
-  drug: Drug;
+  drug: Drug; // This is a specific batch
   onSaveSuccess: () => void;
   onCancel: () => void;
 }
 
-export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrugFormProps) {
-  const { updateDrugDetails, getDrugByName } = useInventory();
+export default function EditDrugForm({ drug: drugBatch, onSaveSuccess, onCancel }: EditDrugFormProps) {
+  const { updateDrugDetails, drugs } = useInventory(); // drugs is for checking conflicts
   const { toast } = useToast();
 
   const form = useForm<EditDrugFormData>({
     resolver: zodResolver(editDrugFormSchema),
     defaultValues: {
-      name: drug.name,
-      brandName: drug.brandName || '',
-      dosage: drug.dosage || '',
-      batchNumber: drug.batchNumber || '',
-      dateOfManufacture: drug.dateOfManufacture || '',
-      dateOfExpiry: drug.dateOfExpiry || '',
-      initialSource: drug.initialSource || '',
-      purchasePricePerStrip: drug.purchasePricePerStrip,
-      lowStockThreshold: drug.lowStockThreshold,
+      name: drugBatch.name,
+      brandName: drugBatch.brandName || '',
+      dosage: drugBatch.dosage || '',
+      batchNumber: drugBatch.batchNumber || '',
+      dateOfManufacture: drugBatch.dateOfManufacture || '',
+      dateOfExpiry: drugBatch.dateOfExpiry || '',
+      initialSource: drugBatch.initialSource || '',
+      purchasePricePerStrip: drugBatch.purchasePricePerStrip,
+      lowStockThreshold: drugBatch.lowStockThreshold,
     },
   });
 
   async function onSubmit(data: EditDrugFormData) {
-    if (data.name && data.name.toLowerCase() !== drug.name.toLowerCase()) {
-      const existingDrugWithNewName = getDrugByName(data.name);
-      if (existingDrugWithNewName && existingDrugWithNewName.id !== drug.id) {
-        form.setError("name", {
-          type: "manual",
-          message: `A drug with generic name "${data.name}" already exists. Please choose a different name.`,
+    // Check for uniqueness: generic name + brand + dosage + batch number
+    const conflictingBatch = drugs.find(d =>
+        d.id !== drugBatch.id && // Exclude the current batch being edited
+        d.name.toLowerCase() === data.name.toLowerCase() &&
+        (d.brandName || '').toLowerCase() === (data.brandName || '').toLowerCase() &&
+        (d.dosage || '').toLowerCase() === (data.dosage || '').toLowerCase() &&
+        (d.batchNumber || '').toLowerCase() === (data.batchNumber || '').toLowerCase()
+    );
+
+    if (conflictingBatch) {
+        form.setError("batchNumber", { // Or a general form error
+            type: "manual",
+            message: "A batch with the same generic name, brand, dosage, and batch number already exists. Please ensure uniqueness.",
+        });
+        toast({
+            variant: "destructive",
+            title: "Validation Error",
+            description: "A batch with these identifying details already exists.",
         });
         return;
-      }
     }
 
-    const result = await updateDrugDetails(drug.id, data);
+    const result = await updateDrugDetails(drugBatch.id, data);
 
     if (result.success) {
       toast({
-        title: "Drug Updated",
-        description: `Details for ${result.updatedDrug?.name || data.name || drug.name} have been saved locally.`,
+        title: "Drug Batch Updated",
+        description: `Details for ${result.updatedDrug?.name} (Batch: ${result.updatedDrug?.batchNumber}) have been saved.`,
         action: <CheckCircle className="text-green-500" />,
       });
       onSaveSuccess();
@@ -133,7 +143,7 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
             name="dosage"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Dosage (Optional)</FormLabel>
+                <FormLabel>Dosage (e.g., 500mg)</FormLabel>
                 <FormControl>
                     <Input placeholder="e.g., 500mg, 10ml" {...field} />
                 </FormControl>
@@ -146,7 +156,7 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
             name="batchNumber"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Batch Number (Optional)</FormLabel>
+                <FormLabel>Batch Number</FormLabel>
                 <FormControl>
                     <Input placeholder="Enter batch number" {...field} />
                 </FormControl>
@@ -172,7 +182,7 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
             name="dateOfExpiry"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Expiry Date (Optional)</FormLabel>
+                <FormLabel>Expiry Date</FormLabel>
                 <FormControl>
                     <Input type="date" {...field} />
                 </FormControl>
@@ -185,9 +195,9 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
             name="initialSource"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Initial Source (Optional)</FormLabel>
+                <FormLabel>Source (Optional)</FormLabel>
                 <FormControl>
-                    <Input placeholder="Enter initial source (e.g., supplier)" {...field} />
+                    <Input placeholder="Enter source (e.g., supplier)" {...field} />
                 </FormControl>
                 <FormMessage />
                 </FormItem>
@@ -211,7 +221,7 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
             name="lowStockThreshold"
             render={({ field }) => (
                 <FormItem className="md:col-span-2">
-                <FormLabel>Low Stock Threshold (Strips)</FormLabel>
+                <FormLabel>Low Stock Threshold (Strips for this batch)</FormLabel>
                 <FormControl>
                     <Input type="number" placeholder="Enter threshold" {...field} min="0" />
                 </FormControl>

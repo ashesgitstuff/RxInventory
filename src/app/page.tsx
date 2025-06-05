@@ -6,18 +6,72 @@ import DrugStockCard from '@/components/inventory/DrugStockCard';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PlusCircle, Loader2 } from 'lucide-react';
-import React from 'react'; // Import React for useEffect and useState
+import React from 'react';
+import type { Drug } from '@/types';
+
+interface GroupedDrug {
+  groupKey: string;
+  displayName: string; // For the card title: Brand Generic Dosage
+  genericName: string;
+  brandName?: string;
+  dosage?: string;
+  totalStock: number;
+  lowStockThreshold: number; // Use threshold from the first batch in group for aggregate warning
+  batches: Drug[];
+}
 
 export default function DashboardPage() {
   const { drugs, loading } = useInventory(); 
   const [isClient, setIsClient] = React.useState(false);
 
   React.useEffect(() => {
-    setIsClient(true); // Set to true after component mounts
+    setIsClient(true);
   }, []);
 
+  const groupedDrugs = React.useMemo(() => {
+    if (!drugs) return [];
+    const groups: Record<string, GroupedDrug> = {};
 
-  if (!isClient || loading) { // Also check for isClient to avoid hydration issues with localStorage access
+    drugs.forEach(drug => {
+      const groupKey = `${drug.name.toLowerCase()}-${(drug.brandName || '').toLowerCase()}-${(drug.dosage || '').toLowerCase()}`;
+      
+      let displayNameSegments: string[] = [];
+      if (drug.brandName) {
+        displayNameSegments.push(drug.brandName);
+      }
+      displayNameSegments.push(drug.name); // Generic name always present
+      if (drug.dosage) {
+        displayNameSegments.push(drug.dosage);
+      }
+      const displayName = displayNameSegments.join(' ');
+
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          groupKey,
+          displayName,
+          genericName: drug.name,
+          brandName: drug.brandName,
+          dosage: drug.dosage,
+          totalStock: 0,
+          lowStockThreshold: drug.lowStockThreshold, // Use first batch's threshold
+          batches: [],
+        };
+      }
+      groups[groupKey].totalStock += drug.stock;
+      groups[groupKey].batches.push(drug);
+      // Sort batches by expiry date (oldest first) if needed for display, or leave as is
+      groups[groupKey].batches.sort((a, b) => {
+        const dateA = a.dateOfExpiry ? new Date(a.dateOfExpiry).getTime() : Infinity;
+        const dateB = b.dateOfExpiry ? new Date(b.dateOfExpiry).getTime() : Infinity;
+        return dateA - dateB;
+      });
+    });
+    return Object.values(groups);
+  }, [drugs]);
+
+
+  if (!isClient || loading) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -26,7 +80,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!drugs || drugs.length === 0) {
+  if (groupedDrugs.length === 0) {
     return (
       <div className="text-center py-10">
         <p className="text-xl text-muted-foreground mb-4">No drugs in inventory.</p>
@@ -47,8 +101,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {drugs.map((drug) => (
-          <DrugStockCard key={drug.id} drug={drug} /> 
+        {groupedDrugs.map((group) => (
+          <DrugStockCard key={group.groupKey} drugGroup={group} /> 
         ))}
       </div>
       

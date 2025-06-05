@@ -15,16 +15,14 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
-import { ListChecks, ArrowDownCircle, ArrowUpCircle, Edit3, AlertCircle, MapPin } from 'lucide-react';
+import { ListChecks, ArrowDownCircle, ArrowUpCircle, Edit3, MapPin } from 'lucide-react';
 import type { Transaction, TransactionDrugDetail } from '@/types';
 
-// Helper to format date strings, handling undefined or invalid dates for display
 const formatDateSafe = (dateString?: string) => {
   if (!dateString) return 'N/A';
   try {
-    return format(parseISO(dateString), 'PP'); // e.g., Aug 17, 2023
+    return format(parseISO(dateString), 'PP'); 
   } catch (error) {
-    // If parsing fails, return the original string or a placeholder
     return dateString; 
   }
 };
@@ -42,8 +40,9 @@ export default function TransactionsPage() {
     return (
       <ul className="list-disc list-inside space-y-1 text-sm">
         {drugDetails.map(detail => (
-          <li key={detail.drugId}>
-            {detail.drugName} {detail.dosage ? `(${detail.dosage})` : ''} {detail.brandName ? `[${detail.brandName}]` : ''}: 
+          <li key={`${detail.drugId}-${detail.batchNumber || 'nobatch'}`}> {/* Ensure unique key with batch */}
+            {detail.drugName} {detail.dosage ? `(${detail.dosage})` : ''} {detail.brandName ? `[${detail.brandName}]` : ''}
+            {detail.batchNumber && ` (Batch: ${detail.batchNumber})`}: 
             <span className={detail.quantity > 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
               {detail.quantity > 0 ? ` +${detail.quantity}` : ` ${detail.quantity}`}
             </span> strips (Prev: {detail.previousStock}, New: {detail.newStock})
@@ -58,9 +57,15 @@ export default function TransactionsPage() {
     const ud = transaction.updateDetails;
     const changes = [];
 
-    if (ud.newName && ud.previousName !== undefined && ud.newName !== ud.previousName) changes.push(`Generic Name: "${ud.previousName}" -> "${ud.newName}"`);
-    else if (ud.newName && ud.previousName === undefined) changes.push(`Generic Name set to: "${ud.newName}"`);
+    // Primary identifiers for the updated batch
+    let batchIdentifier = `${ud.drugName || 'Drug'}`;
+    if (ud.newBrandName) batchIdentifier = `${ud.newBrandName} ${batchIdentifier}`;
+    if (ud.newDosage) batchIdentifier += ` ${ud.newDosage}`;
+    if (ud.newBatchNumber) batchIdentifier += ` (Batch: ${ud.newBatchNumber})`;
+    else if (ud.previousBatchNumber) batchIdentifier += ` (Batch: ${ud.previousBatchNumber})`;
 
+
+    if (ud.newName && ud.previousName !== undefined && ud.newName !== ud.previousName) changes.push(`Generic Name: "${ud.previousName}" -> "${ud.newName}"`);
     if (ud.newBrandName !== undefined && ud.newBrandName !== ud.previousBrandName) changes.push(`Brand Name: "${ud.previousBrandName || 'N/A'}" -> "${ud.newBrandName || 'N/A'}"`);
     if (ud.newDosage !== undefined && ud.newDosage !== ud.previousDosage) changes.push(`Dosage: "${ud.previousDosage || 'N/A'}" -> "${ud.newDosage || 'N/A'}"`);
     if (ud.newBatchNumber !== undefined && ud.newBatchNumber !== ud.previousBatchNumber) changes.push(`Batch No: "${ud.previousBatchNumber || 'N/A'}" -> "${ud.newBatchNumber || 'N/A'}"`);
@@ -69,24 +74,18 @@ export default function TransactionsPage() {
     if (ud.newDateOfExpiry !== undefined && ud.newDateOfExpiry !== ud.previousDateOfExpiry) changes.push(`Exp. Date: ${formatDateSafe(ud.previousDateOfExpiry)} -> ${formatDateSafe(ud.newDateOfExpiry)}`);
     
     if (ud.newPrice !== undefined && ud.previousPrice !== undefined && ud.newPrice !== ud.previousPrice) changes.push(`Price: INR ${ud.previousPrice.toFixed(2)} -> INR ${ud.newPrice.toFixed(2)}`);
-    else if (ud.newPrice !== undefined && ud.previousPrice === undefined) changes.push(`Price set to: INR ${ud.newPrice.toFixed(2)}`);
-
     if (ud.newThreshold !== undefined && ud.previousThreshold !== undefined && ud.newThreshold !== ud.previousThreshold) changes.push(`Threshold: ${ud.previousThreshold} -> ${ud.newThreshold} strips`);
-    else if (ud.newThreshold !== undefined && ud.previousThreshold === undefined) changes.push(`Threshold set to: ${ud.newThreshold} strips`);
-
-    if (ud.newSource !== undefined && ud.previousSource !== undefined && ud.newSource !== ud.previousSource) changes.push(`Source: "${ud.previousSource || 'N/A'}" -> "${ud.newSource || 'N/A'}"`);
-    else if (ud.newSource !== undefined && ud.previousSource === undefined) changes.push(`Source set to: "${ud.newSource || 'N/A'}"`);
-
+    if (ud.newSource !== undefined && ud.newSource !== ud.previousSource) changes.push(`Source: "${ud.previousSource || 'N/A'}" -> "${ud.newSource || 'N/A'}"`);
 
     if (changes.length === 0 && !transaction.notes?.includes('details updated')) { 
-        return transaction.notes ? <p className="text-sm">{transaction.notes}</p> : <p className="text-sm text-muted-foreground">No specific field changes recorded.</p>;
+        return transaction.notes ? <p className="text-sm">{transaction.notes}</p> : <p className="text-sm text-muted-foreground">No specific field changes recorded for {batchIdentifier}.</p>;
     }
 
     return (
       <div className="text-sm space-y-0.5">
-        <p className="font-semibold">Updated: {ud.drugName} {ud.newDosage ? `(${ud.newDosage})` : ''} {ud.newBrandName ? `[${ud.newBrandName}]` : ''}</p>
+        <p className="font-semibold">Updated: {batchIdentifier}</p>
         {changes.map((change, idx) => <p key={idx}><Edit3 className="inline h-3 w-3 mr-1 text-blue-500 shrink-0"/>{change}</p>)}
-        {transaction.notes && !transaction.notes.startsWith('Drug details updated for') && <p className="mt-1 italic text-muted-foreground">{transaction.notes}</p>}
+        {transaction.notes && !transaction.notes.startsWith('Details updated for batch:') && !transaction.notes.startsWith('Purchase price updated for') && <p className="mt-1 italic text-muted-foreground">{transaction.notes}</p>}
       </div>
     );
   }
@@ -99,7 +98,7 @@ export default function TransactionsPage() {
             <ListChecks className="h-6 w-6 text-primary" />
             Transaction Log
           </CardTitle>
-          <CardDescription>A record of all inventory movements, updates, and camp details.</CardDescription>
+          <CardDescription>A record of all inventory movements, batch updates, and camp details.</CardDescription>
         </CardHeader>
         <CardContent>
           {sortedTransactions.length === 0 ? (
@@ -113,7 +112,7 @@ export default function TransactionsPage() {
                     <TableHead className="w-[180px]">Timestamp</TableHead>
                     <TableHead className="w-[120px]">Type</TableHead>
                     <TableHead>Details / Patient & Camp Info</TableHead>
-                    <TableHead>Drugs Involved / Changes</TableHead>
+                    <TableHead>Drug Batches Involved / Changes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -145,7 +144,7 @@ export default function TransactionsPage() {
                           <p><strong>Source:</strong> {transaction.source}</p>
                         )}
                          {transaction.type === 'update' && (
-                            transaction.notes && !transaction.notes.startsWith('Drug details updated for') ? <p className="text-sm italic">{transaction.notes}</p> : <span className="text-sm text-muted-foreground">Details changed</span>
+                            transaction.notes && !transaction.notes.startsWith('Details updated for batch:') && !transaction.notes.startsWith('Purchase price updated for') ? <p className="text-sm italic">{transaction.notes}</p> : <span className="text-sm text-muted-foreground">Batch details changed</span>
                         )}
                       </TableCell>
                       <TableCell>
