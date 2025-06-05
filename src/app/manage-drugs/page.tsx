@@ -14,7 +14,7 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import { Edit, Pill, Info } from 'lucide-react';
+import { Edit, Pill, Info, Trash2, AlertTriangle } from 'lucide-react';
 import EditDrugForm from '@/components/inventory/EditDrugForm';
 import {
   Dialog,
@@ -23,7 +23,18 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format, parseISO } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 const formatDateSafe = (dateString?: string) => {
   if (!dateString) return 'N/A';
@@ -35,9 +46,12 @@ const formatDateSafe = (dateString?: string) => {
 };
 
 export default function ManageDrugsPage() {
-  const { drugs } = useInventory(); // `drugs` is the list of all batches
+  const { drugs, deleteDrugBatch } = useInventory(); 
   const [selectedDrugBatch, setSelectedDrugBatch] = useState<Drug | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [drugToDelete, setDrugToDelete] = useState<Drug | null>(null);
+  const { toast } = useToast();
 
   const handleEdit = (drugBatch: Drug) => {
     setSelectedDrugBatch(drugBatch);
@@ -49,7 +63,32 @@ export default function ManageDrugsPage() {
     setSelectedDrugBatch(null);
   };
 
-  // Sort drugs by generic name, then brand name, then batch number for consistent display
+  const openDeleteDialog = (drugBatch: Drug) => {
+    setDrugToDelete(drugBatch);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!drugToDelete) return;
+
+    const result = await deleteDrugBatch(drugToDelete.id);
+    if (result.success) {
+      toast({
+        title: "Batch Deleted",
+        description: result.message,
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Deletion Failed",
+        description: result.message || "Could not delete the drug batch.",
+      });
+    }
+    setIsDeleteDialogOpen(false);
+    setDrugToDelete(null);
+  };
+
+
   const sortedDrugBatches = React.useMemo(() => {
     return [...drugs].sort((a, b) => {
       if (a.name.toLowerCase() < b.name.toLowerCase()) return -1;
@@ -70,7 +109,7 @@ export default function ManageDrugsPage() {
             <Pill className="h-6 w-6 text-primary" />
             Manage Drug Batches
           </CardTitle>
-          <CardDescription>View and edit details of individual drug batches in your inventory.</CardDescription>
+          <CardDescription>View, edit, or delete details of individual drug batches in your inventory.</CardDescription>
         </CardHeader>
         <CardContent>
           {sortedDrugBatches.length === 0 ? (
@@ -106,9 +145,12 @@ export default function ManageDrugsPage() {
                       <TableCell className="text-right">{batch.stock}</TableCell>
                       <TableCell className="text-right">INR {batch.purchasePricePerStrip.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{batch.lowStockThreshold}</TableCell>
-                      <TableCell className="text-center">
+                      <TableCell className="text-center space-x-2">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(batch)}>
                           <Edit className="mr-2 h-4 w-4" /> Edit
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(batch)}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -141,6 +183,31 @@ export default function ManageDrugsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {drugToDelete && (
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Confirm Deletion
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to permanently delete the batch: 
+                <span className="font-semibold"> {drugToDelete.name} {drugToDelete.brandName ? `[${drugToDelete.brandName}]` : ''} {drugToDelete.dosage ? `(${drugToDelete.dosage})` : ''} (Batch: {drugToDelete.batchNumber || 'N/A'})</span>? 
+                This action cannot be undone and will remove it from inventory.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDrugToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                Yes, Delete Batch
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
+

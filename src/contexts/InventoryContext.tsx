@@ -22,6 +22,7 @@ interface InventoryContextType {
   dispenseDrugs: (patientDetails: Omit<DispenseFormData, 'drugsToDispense'>, drugsToDispense: Array<DrugDispenseEntry>) => Promise<{ success: boolean; message?: string; dispensedDrugsInfo: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }> }>;
   restockDrugs: (source: string, drugsToRestock: Array<DrugRestockEntry>) => Promise<{ success: boolean; message?: string; restockedDrugs: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }> }>;
   updateDrugDetails: (drugId: string, data: EditDrugFormData) => Promise<{ success: boolean; message?: string; updatedDrug?: Drug }>;
+  deleteDrugBatch: (drugId: string) => Promise<{ success: boolean; message?: string; deletedDrugName?: string }>;
   getDrugById: (drugId: string) => Drug | undefined;
   getDrugGroupsForDisplay: () => GroupedDrugDisplay[];
   getVillages: () => Village[];
@@ -166,12 +167,11 @@ const dispenseDrugs = async (
     
     let overallSuccess = true;
     let overallMessage = '';
+    const successfullyDispensedForToast: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }> = [];
+    const transactionDrugDetailsForLog: TransactionDrugDetail[] = [];
     
-    const newTransactionDrugDetails: TransactionDrugDetail[] = [];
-    const newSuccessfullyDispensedForToast: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }> = [];
-    
-    // Create a new array based on the current drugs state by deep copying objects
-    const nextDrugsState = drugs.map(d => ({ ...d })); 
+    // Create a deep copy of the current drugs state to work with
+    const currentDrugsStateCopy = drugs.map(d => ({ ...d }));
 
     for (const request of drugsToDispenseRequest) {
       const [reqGenericName, reqBrandName, reqDosage] = request.selectedDrugGroupKey.split('-DELIMITER-');
@@ -182,13 +182,12 @@ const dispenseDrugs = async (
           continue;
       }
 
-      // Filter from the 'nextDrugsState' copy
-      const matchingBatches = nextDrugsState.filter(d => 
+      const matchingBatches = currentDrugsStateCopy.filter(d => 
         d.name.toLowerCase() === reqGenericName.toLowerCase() &&
         (d.brandName || '').toLowerCase() === (reqBrandName || '').toLowerCase() && 
         (d.dosage || '').toLowerCase() === (reqDosage || '').toLowerCase() && 
         d.stock > 0
-      ).sort((a, b) => { // Sort by expiry date, earliest first
+      ).sort((a, b) => {
         const dateA = a.dateOfExpiry ? parseISO(a.dateOfExpiry) : new Date(8640000000000000); 
         const dateB = b.dateOfExpiry ? parseISO(b.dateOfExpiry) : new Date(8640000000000000);
         return compareAsc(dateA, dateB);
@@ -204,82 +203,78 @@ const dispenseDrugs = async (
       if (totalStockForDrugType < stripsToDispense) {
         overallSuccess = false;
         overallMessage += `Not enough stock for ${reqGenericName || 'Unknown Drug'} ${reqBrandName || ''} ${reqDosage || ''}. Available: ${totalStockForDrugType}, Requested: ${stripsToDispense}. Dispensing available. `;
-        stripsToDispense = totalStockForDrugType; // Adjust to dispense only what's available
-        if (stripsToDispense === 0) continue; // Nothing to dispense if adjusted to zero
+        stripsToDispense = totalStockForDrugType;
+        if (stripsToDispense === 0) continue;
       }
       
       let dispensedThisItem = 0;
-      for (const batch of matchingBatches) { // Iterate over filtered batches from `nextDrugsState`
-        if (stripsToDispense === 0) break; // All requested strips for this item have been dispensed
+      for (const batch of matchingBatches) {
+        if (stripsToDispense === 0) break;
 
-        // Find the batch in `nextDrugsState` by its ID to modify it
-        const batchToUpdate = nextDrugsState.find(d => d.id === batch.id);
-        // This check is crucial: we are modifying the `nextDrugsState` array elements directly
-        if (!batchToUpdate) {
-             console.error("Critical error: Batch from filtered list not found in nextDrugsState. This should not happen.");
+        const batchInCopy = currentDrugsStateCopy.find(d => d.id === batch.id);
+        if (!batchInCopy) {
+             console.error("Critical error: Batch from filtered list not found in currentDrugsStateCopy.");
              overallSuccess = false;
              overallMessage += `Critical error processing ${reqGenericName}. `;
-             continue; // Skip this batch if something went terribly wrong
+             continue;
         }
 
-        const originalStock = batchToUpdate.stock; 
-        const dispensableFromThisBatch = Math.min(stripsToDispense, batchToUpdate.stock);
+        const originalStock = batchInCopy.stock; 
+        const dispensableFromThisBatch = Math.min(stripsToDispense, batchInCopy.stock);
         
-        batchToUpdate.stock -= dispensableFromThisBatch; // Modify the element in `nextDrugsState`
+        batchInCopy.stock -= dispensableFromThisBatch;
         stripsToDispense -= dispensableFromThisBatch;
         dispensedThisItem += dispensableFromThisBatch;
 
-        newTransactionDrugDetails.push({
-          drugId: batchToUpdate.id,
-          drugName: batchToUpdate.name,
-          brandName: batchToUpdate.brandName,
-          dosage: batchToUpdate.dosage,
-          batchNumber: batchToUpdate.batchNumber,
-          quantity: -dispensableFromThisBatch, // Negative for dispense
+        transactionDrugDetailsForLog.push({
+          drugId: batchInCopy.id,
+          drugName: batchInCopy.name,
+          brandName: batchInCopy.brandName,
+          dosage: batchInCopy.dosage,
+          batchNumber: batchInCopy.batchNumber,
+          quantity: -dispensableFromThisBatch,
           previousStock: originalStock,
-          newStock: batchToUpdate.stock,
+          newStock: batchInCopy.stock,
         });
-        newSuccessfullyDispensedForToast.push({ 
-           drugName: batchToUpdate.name, 
-           brandName: batchToUpdate.brandName || undefined, 
-           dosage: batchToUpdate.dosage || undefined, 
-           batchNumber: batchToUpdate.batchNumber, 
+        successfullyDispensedForToast.push({ 
+           drugName: batchInCopy.name, 
+           brandName: batchInCopy.brandName || undefined, 
+           dosage: batchInCopy.dosage || undefined, 
+           batchNumber: batchInCopy.batchNumber, 
            quantity: dispensableFromThisBatch 
         });
       }
       
-      if (stripsToDispense > 0 && request.stripsDispensed > 0 && dispensedThisItem < request.stripsDispensed) { // If some strips couldn't be dispensed for this item
-          overallSuccess = false; // Mark overall success as false due to partial dispense
-          // Add a specific message for this item if not already present
+      if (stripsToDispense > 0 && request.stripsDispensed > 0 && dispensedThisItem < request.stripsDispensed) {
+          overallSuccess = false;
           if (!overallMessage.includes(`Partially dispensed for ${reqGenericName}`)) {
                overallMessage += `Partially dispensed for ${reqGenericName || 'Unknown Drug'} ${reqBrandName || ''} ${reqDosage || ''}. `;
           }
       }
     }
 
-    // After the loop, `nextDrugsState` contains the modified drug list
-    setDrugs(nextDrugsState);
-
-    if (newTransactionDrugDetails.length > 0) {
-      addTransaction({
-        type: 'dispense',
-        patientName: patientDetails.patientName,
-        aadharLastFour: patientDetails.aadharLastFour,
-        age: patientDetails.age,
-        sex: patientDetails.sex,
-        villageName: patientDetails.villageName,
-        drugs: newTransactionDrugDetails, // Use the locally built array
-        notes: overallMessage || 'Dispense operation completed.',
-      });
+    // If any drugs were actually processed (stock changed), update the state and log transaction
+    if (transactionDrugDetailsForLog.length > 0) {
+        setDrugs(currentDrugsStateCopy); // Set the modified copy as the new state
+        addTransaction({
+            type: 'dispense',
+            patientName: patientDetails.patientName,
+            aadharLastFour: patientDetails.aadharLastFour,
+            age: patientDetails.age,
+            sex: patientDetails.sex,
+            villageName: patientDetails.villageName,
+            drugs: transactionDrugDetailsForLog,
+            notes: overallMessage || 'Dispense operation completed.',
+        });
     } else if (!overallSuccess && overallMessage.length === 0) {
-        // This case might happen if all requested items had zero quantity or no stock at all
         overallMessage = "No drugs were dispensed. Check stock or request details."
     }
+
 
     return { 
         success: overallSuccess, 
         message: overallMessage.trim() || (overallSuccess ? "Dispense successful." : "Dispense failed or partially completed."),
-        dispensedDrugsInfo: newSuccessfullyDispensedForToast // Use the locally built array
+        dispensedDrugsInfo: successfullyDispensedForToast
     };
   };
 
@@ -292,30 +287,28 @@ const dispenseDrugs = async (
     restockedDrugs: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }>;
   }> => {
     const newDrugsFromRestock: Drug[] = [];
-    const updatedExistingDrugs: Drug[] = [];
+    const updatedExistingDrugsMap = new Map<string, Drug>(); // To efficiently track updates
+
     const transactionDetailsForMainLog: TransactionDrugDetail[] = [];
     const restockedDrugsInfoForReturn: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }> = [];
     const priceUpdateTransactionsToLog: Array<Omit<Transaction, 'id' | 'timestamp'>> = [];
 
-    const currentDrugsCopy = drugs.map(d => ({...d})); // Create a mutable copy
+    // Create a base state from current drugs to apply modifications
+    let nextDrugsState = drugs.map(d => ({...d}));
 
     drugsToRestockItems.forEach(item => {
       if (item.drugId === '--add-new--' && item.newDrugDetails) {
         const nd = item.newDrugDetails;
         const newDrugBatch: Drug = {
           id: generateId('drug'),
-          name: nd.name,
-          brandName: nd.brandName,
-          dosage: nd.dosage,
-          batchNumber: nd.batchNumber,
-          dateOfManufacture: nd.dateOfManufacture,
-          dateOfExpiry: nd.dateOfExpiry,
+          name: nd.name, brandName: nd.brandName, dosage: nd.dosage, batchNumber: nd.batchNumber,
+          dateOfManufacture: nd.dateOfManufacture, dateOfExpiry: nd.dateOfExpiry,
           purchasePricePerStrip: nd.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE,
           stock: item.stripsAdded,
           lowStockThreshold: nd.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
           initialSource: source,
         };
-        newDrugsFromRestock.push(newDrugBatch);
+        newDrugsFromRestock.push(newDrugBatch); // Will be added to nextDrugsState later
         transactionDetailsForMainLog.push({
           drugId: newDrugBatch.id, drugName: newDrugBatch.name, brandName: newDrugBatch.brandName,
           dosage: newDrugBatch.dosage, batchNumber: newDrugBatch.batchNumber, quantity: item.stripsAdded,
@@ -326,9 +319,9 @@ const dispenseDrugs = async (
           batchNumber: newDrugBatch.batchNumber, quantity: item.stripsAdded 
         });
       } else {
-        const drugIndexInCopy = currentDrugsCopy.findIndex(d => d.id === item.drugId);
-        if (drugIndexInCopy !== -1) {
-          const drugToUpdate = currentDrugsCopy[drugIndexInCopy]; // This is a reference to an object in currentDrugsCopy
+        const drugIndex = nextDrugsState.findIndex(d => d.id === item.drugId);
+        if (drugIndex !== -1) {
+          const drugToUpdate = {...nextDrugsState[drugIndex]}; // Create a copy to modify
           const previousStock = drugToUpdate.stock;
           
           drugToUpdate.stock += item.stripsAdded;
@@ -337,8 +330,7 @@ const dispenseDrugs = async (
             const oldPrice = drugToUpdate.purchasePricePerStrip;
             drugToUpdate.purchasePricePerStrip = item.updatedPurchasePricePerStrip;
             priceUpdateTransactionsToLog.push({
-              type: 'update',
-              drugs: [], 
+              type: 'update', drugs: [], 
               notes: `Purchase price updated for ${drugToUpdate.brandName || drugToUpdate.name} ${drugToUpdate.dosage || ''} (Batch: ${drugToUpdate.batchNumber}) to INR ${item.updatedPurchasePricePerStrip.toFixed(2)}.`,
               updateDetails: {
                 drugId: drugToUpdate.id, drugName: drugToUpdate.name, previousPrice: oldPrice, newPrice: item.updatedPurchasePricePerStrip,
@@ -346,7 +338,9 @@ const dispenseDrugs = async (
               }
             });
           }
-          updatedExistingDrugs.push(drugToUpdate); // Collect the updated drug
+          nextDrugsState[drugIndex] = drugToUpdate; // Replace the old object with the updated one
+          updatedExistingDrugsMap.set(drugToUpdate.id, drugToUpdate); // Track this update
+
           transactionDetailsForMainLog.push({
             drugId: drugToUpdate.id, drugName: drugToUpdate.name, brandName: drugToUpdate.brandName,
             dosage: drugToUpdate.dosage, batchNumber: drugToUpdate.batchNumber, quantity: item.stripsAdded,
@@ -360,19 +354,16 @@ const dispenseDrugs = async (
       }
     });
 
-    // Combine the untouched drugs from currentDrugsCopy with new and updated ones
-    const nextDrugsState = currentDrugsCopy.map(drug => {
-      const updatedVersion = updatedExistingDrugs.find(ud => ud.id === drug.id);
-      return updatedVersion || drug; // Use updated version if exists, else original from copy
-    }).concat(newDrugsFromRestock); // Add newly created drugs
-
+    // Add all newly created drugs to the state
+    if (newDrugsFromRestock.length > 0) {
+      nextDrugsState = [...nextDrugsState, ...newDrugsFromRestock];
+    }
+    
     setDrugs(nextDrugsState);
 
     if (transactionDetailsForMainLog.length > 0) {
         addTransaction({
-            type: 'restock',
-            source: source,
-            drugs: transactionDetailsForMainLog, 
+            type: 'restock', source: source, drugs: transactionDetailsForMainLog, 
             notes: `Restocked from ${source}.`
         });
     }
@@ -380,7 +371,6 @@ const dispenseDrugs = async (
 
     return { success: true, message: "Stock updated successfully.", restockedDrugs: restockedDrugsInfoForReturn };
   };
-
 
   const updateDrugDetails = async (drugId: string, data: EditDrugFormData): Promise<{ success: boolean; message?: string; updatedDrug?: Drug }> => {
     let updatedDrugInstance: Drug | undefined = undefined;
@@ -445,6 +435,34 @@ const dispenseDrugs = async (
     return { success: false, message: 'Failed to find drug to update.' };
   };
 
+  const deleteDrugBatch = async (drugId: string): Promise<{ success: boolean; message?: string; deletedDrugName?: string }> => {
+    const drugToDelete = drugs.find(d => d.id === drugId);
+    if (!drugToDelete) {
+      return { success: false, message: "Drug batch not found." };
+    }
+
+    const deletedDrugName = `${drugToDelete.name} ${drugToDelete.brandName || ''} ${drugToDelete.dosage || ''} (Batch: ${drugToDelete.batchNumber || 'N/A'})`;
+    
+    setDrugs(prevDrugs => prevDrugs.filter(d => d.id !== drugId));
+
+    let expiryDateFormatted = 'N/A';
+    if (drugToDelete.dateOfExpiry) {
+        try {
+            expiryDateFormatted = format(parseISO(drugToDelete.dateOfExpiry), 'PP');
+        } catch (e) {
+            expiryDateFormatted = drugToDelete.dateOfExpiry; // fallback to raw string if parse fails
+        }
+    }
+
+    addTransaction({
+      type: 'update',
+      drugs: [], 
+      notes: `DELETED BATCH: ${deletedDrugName}. Stock at deletion: ${drugToDelete.stock}. Price/strip: INR ${drugToDelete.purchasePricePerStrip.toFixed(2)}. Exp: ${expiryDateFormatted}.`,
+    });
+
+    return { success: true, message: `Drug batch "${deletedDrugName}" deleted successfully.`, deletedDrugName };
+  };
+
   const resetInventoryData = useCallback(() => {
     setLoading(true);
     localStorage.removeItem(DRUGS_STORAGE_KEY);
@@ -468,7 +486,8 @@ const dispenseDrugs = async (
         addVillage, 
         dispenseDrugs, 
         restockDrugs, 
-        updateDrugDetails, 
+        updateDrugDetails,
+        deleteDrugBatch,
         getDrugById,
         getDrugGroupsForDisplay,
         getVillages,
