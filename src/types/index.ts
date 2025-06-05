@@ -15,52 +15,66 @@ export interface Drug {
 
 export const INITIAL_DRUGS: Drug[] = [
   // Each object is a distinct batch
-  { 
-    id: 'metformin-500mg-batch1', 
-    name: 'Metformin', 
+  {
+    id: 'metformin-500mg-glycomet-batch1',
+    name: 'Metformin',
     dosage: '500mg',
     brandName: 'Glycomet',
     batchNumber: 'M001',
     dateOfManufacture: '2023-01-01',
     dateOfExpiry: '2025-01-01',
-    purchasePricePerStrip: 5, 
-    stock: 30, 
-    lowStockThreshold: 10, 
-    initialSource: 'System Setup' 
+    purchasePricePerStrip: 5,
+    stock: 30,
+    lowStockThreshold: 10,
+    initialSource: 'System Setup'
   },
-  { 
-    id: 'metformin-500mg-batch2', 
-    name: 'Metformin', 
+  {
+    id: 'metformin-500mg-glycomet-batch2',
+    name: 'Metformin',
     dosage: '500mg',
     brandName: 'Glycomet',
     batchNumber: 'M002',
     dateOfManufacture: '2023-06-01',
     dateOfExpiry: '2025-06-01',
-    purchasePricePerStrip: 5.5, 
-    stock: 20, 
-    lowStockThreshold: 10, 
-    initialSource: 'System Setup' 
+    purchasePricePerStrip: 5.5,
+    stock: 20,
+    lowStockThreshold: 10,
+    initialSource: 'System Setup'
   },
-  { 
-    id: 'amlong-5mg-batch1', 
-    name: 'Amlodipine', 
+   {
+    id: 'metformin-500mg-generic-batch3',
+    name: 'Metformin',
+    dosage: '500mg',
+    brandName: '', // Or some indicator for generic
+    batchNumber: 'MG003',
+    dateOfManufacture: '2023-07-01',
+    dateOfExpiry: '2024-07-01', // Earlier expiry for testing
+    purchasePricePerStrip: 4.5,
+    stock: 15,
+    lowStockThreshold: 5,
+    initialSource: 'System Setup'
+  },
+  {
+    id: 'amlong-5mg-batch1',
+    name: 'Amlodipine',
     dosage: '5mg',
     brandName: 'Amlong',
     batchNumber: 'A002',
     dateOfManufacture: '2023-03-01',
     dateOfExpiry: '2025-03-01',
-    purchasePricePerStrip: 10, 
-    stock: 50, 
-    lowStockThreshold: 10, 
-    initialSource: 'System Setup' 
+    purchasePricePerStrip: 10,
+    stock: 50,
+    lowStockThreshold: 10,
+    initialSource: 'System Setup'
   },
 ];
 
-export const DEFAULT_PURCHASE_PRICE = 1; 
+export const DEFAULT_PURCHASE_PRICE = 1;
 export const DEFAULT_DRUG_LOW_STOCK_THRESHOLD = 5;
 
 export interface DrugDispenseEntry {
-  drugId: string; // ID of the specific batch to dispense from
+  // drugId: string; // ID of the specific batch to dispense from - CHANGED
+  selectedDrugGroupKey: string; // Key representing the drug type (e.g., "generic-brand-dosage")
   stripsDispensed: number;
 }
 
@@ -69,7 +83,7 @@ export interface DispenseFormData {
   aadharLastFour: string;
   age: number;
   sex: 'Male' | 'Female' | 'Other' | '';
-  villageName?: string; 
+  villageName?: string;
   drugsToDispense: DrugDispenseEntry[];
 }
 
@@ -103,7 +117,7 @@ export interface TransactionDrugDetail {
   brandName?: string; // (snapshot)
   dosage?: string; // (snapshot)
   batchNumber?: string; // (snapshot)
-  quantity: number; 
+  quantity: number;
   previousStock: number; // Stock of this batch before transaction
   newStock: number; // Stock of this batch after transaction
 }
@@ -111,20 +125,20 @@ export interface TransactionDrugDetail {
 export interface Transaction {
   id: string;
   type: 'dispense' | 'restock' | 'update';
-  timestamp: string; 
+  timestamp: string;
   patientName?: string;
   aadharLastFour?: string;
   age?: number;
   sex?: 'Male' | 'Female' | 'Other';
-  villageName?: string; 
-  source?: string; 
-  drugs: TransactionDrugDetail[]; 
-  notes?: string; 
-  updateDetails?: { 
+  villageName?: string;
+  source?: string;
+  drugs: TransactionDrugDetail[];
+  notes?: string;
+  updateDetails?: {
     drugId: string; // ID of the specific batch updated
     drugName: string; // Generic name (snapshot, usually the new one)
-    previousName?: string; 
-    newName?: string; 
+    previousName?: string;
+    newName?: string;
     previousBrandName?: string;
     newBrandName?: string;
     previousDosage?: string;
@@ -160,4 +174,18 @@ export interface EditDrugFormData {
 export interface Village {
   id: string;
   name: string;
+}
+
+// For dashboard display and dispense form selection
+export interface GroupedDrugDisplay {
+  groupKey: string; // e.g., "metformin-glycomet-500mg" or "metformin--500mg"
+  displayName: string; // For UI display, e.g., "Metformin Glycomet 500mg"
+  genericName: string;
+  brandName?: string;
+  dosage?: string;
+  totalStock: number;
+  // Use the threshold of the first batch in the group for the aggregate warning
+  lowStockThreshold: number;
+  // Batches belonging to this group, sorted by expiry
+  batches: Drug[];
 }
