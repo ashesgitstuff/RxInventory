@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 export const metadata: Metadata = {
   title: 'ChotusDrugBus - Pharmacy Management',
   description: 'Manage your rural health clinic pharmacy inventory efficiently.',
+  manifest: '/manifest.json', // Added manifest link for PWA
 };
 
 export default function RootLayout({
@@ -21,6 +22,8 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
+        <meta name="theme-color" content="#111827" /> {/* Theme color for PWA */}
+        {/* Removed duplicate manifest link, it's now in Metadata object */}
       </head>
       <body className="font-body antialiased bg-background text-foreground min-h-screen flex flex-col">
         <InventoryProvider>
@@ -34,4 +37,3 @@ export default function RootLayout({
     </html>
   );
 }
-
