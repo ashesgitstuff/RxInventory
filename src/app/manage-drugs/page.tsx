@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Edit, Edit3 } from 'lucide-react';
 import EditDrugForm from '@/components/inventory/EditDrugForm';
+import SettingsForm from '@/components/SettingsForm'; // Import SettingsForm
 import {
   Dialog,
   DialogContent,
@@ -102,6 +103,9 @@ export default function ManageDrugsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Add SettingsForm for managing threshold */}
+      <SettingsForm />
     </div>
   );
 }
