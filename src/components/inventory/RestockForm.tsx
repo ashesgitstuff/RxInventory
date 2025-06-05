@@ -122,7 +122,7 @@ export default function RestockForm() {
       const drugSummary = result.restockedDrugs.map(d => `${d.quantity}x ${d.drugName}`).join(', ');
       toast({
         title: "Restock Successful",
-        description: `${drugSummary} added from ${data.source}. Total cost: ₹${grandTotal.toFixed(2)}`,
+        description: `${drugSummary} added from ${data.source}. Total cost: INR ${grandTotal.toFixed(2)}`,
         action: <CheckCircle className="text-green-500" />,
       });
       form.reset({
@@ -262,7 +262,7 @@ export default function RestockForm() {
                     )}
                   />
                   <FormItem>
-                    <FormLabel>Cost/Strip (₹)</FormLabel>
+                    <FormLabel>Cost/Strip (INR)</FormLabel>
                     {fieldStates[index]?.isNewDrug ? (
                        <FormField
                             control={form.control}
@@ -277,7 +277,7 @@ export default function RestockForm() {
                         <Input 
                             type="text" 
                             value={typeof getPurchasePricePerStripForDisplay(watchedDrugsToRestock[index]) === 'number' 
-                                ? `₹${(getPurchasePricePerStripForDisplay(watchedDrugsToRestock[index]) as number).toFixed(2)}` 
+                                ? `INR ${(getPurchasePricePerStripForDisplay(watchedDrugsToRestock[index]) as number).toFixed(2)}` 
                                 : getPurchasePricePerStripForDisplay(watchedDrugsToRestock[index])} 
                             readOnly 
                             className="bg-muted"
@@ -308,7 +308,7 @@ export default function RestockForm() {
                   </div>
                 )}
                  <div className="text-right font-semibold mt-2">
-                    Line Total: ₹{getLineItemTotal(index).toFixed(2)}
+                    Line Total: INR {getLineItemTotal(index).toFixed(2)}
                 </div>
               </div>
             ))}
@@ -323,7 +323,7 @@ export default function RestockForm() {
 
             <Separator />
             <div className="text-right text-xl font-bold text-foreground">
-                Grand Total: ₹{grandTotal.toFixed(2)}
+                Grand Total: INR {grandTotal.toFixed(2)}
             </div>
             <Button type="submit" className="w-full text-lg py-6 shadow-md hover:shadow-lg transition-shadow">
               Add All to Stock

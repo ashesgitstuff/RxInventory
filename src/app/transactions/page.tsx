@@ -46,8 +46,8 @@ export default function TransactionsPage() {
     if (newName && previousName) changes.push(`Name: "${previousName}" -> "${newName}"`);
     else if (newName) changes.push(`Name set to: "${newName}"`);
     
-    if (newPrice !== undefined && previousPrice !== undefined) changes.push(`Price: ₹${previousPrice.toFixed(2)} -> ₹${newPrice.toFixed(2)}`);
-    else if (newPrice !== undefined) changes.push(`Price set to: ₹${newPrice.toFixed(2)}`);
+    if (newPrice !== undefined && previousPrice !== undefined) changes.push(`Price: INR ${previousPrice.toFixed(2)} -> INR ${newPrice.toFixed(2)}`);
+    else if (newPrice !== undefined) changes.push(`Price set to: INR ${newPrice.toFixed(2)}`);
 
     return (
       <div className="text-sm">

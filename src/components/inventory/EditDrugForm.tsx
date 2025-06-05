@@ -95,7 +95,7 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
           name="purchasePricePerStrip"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Purchase Price Per Strip (₹)</FormLabel>
+              <FormLabel>Purchase Price Per Strip (INR)</FormLabel>
               <FormControl>
                 <Input type="number" placeholder="e.g., 2.50" {...field} min="0" step="0.01" />
               </FormControl>
