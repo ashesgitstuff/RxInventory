@@ -41,7 +41,7 @@ export default function TransactionsPage() {
 
   const renderUpdateDetails = (transaction: Transaction) => {
     if (transaction.type !== 'update' || !transaction.updateDetails) return null;
-    const { drugName, previousName, newName, previousPrice, newPrice, previousThreshold, newThreshold } = transaction.updateDetails;
+    const { drugName, previousName, newName, previousPrice, newPrice, previousThreshold, newThreshold, previousSource, newSource } = transaction.updateDetails;
     const changes = [];
     if (newName && previousName && newName !== previousName) changes.push(`Name: "${previousName}" -> "${newName}"`);
     else if (newName && !previousName) changes.push(`Name set to: "${newName}"`);
@@ -52,8 +52,11 @@ export default function TransactionsPage() {
     if (newThreshold !== undefined && previousThreshold !== undefined && newThreshold !== previousThreshold) changes.push(`Threshold: ${previousThreshold} -> ${newThreshold} strips`);
     else if (newThreshold !== undefined && previousThreshold === undefined) changes.push(`Threshold set to: ${newThreshold} strips`);
 
+    if (newSource !== undefined && previousSource !== undefined && newSource !== previousSource) changes.push(`Source: "${previousSource}" -> "${newSource}"`);
+    else if (newSource !== undefined && previousSource === undefined) changes.push(`Source set to: "${newSource}"`);
 
-    if (changes.length === 0 && !transaction.notes?.includes('details updated')) { // if no specific changes, show generic note
+
+    if (changes.length === 0 && !transaction.notes?.includes('details updated')) { 
         return transaction.notes ? <p className="text-sm">{transaction.notes}</p> : <p className="text-sm text-muted-foreground">No specific field changes recorded.</p>;
     }
 

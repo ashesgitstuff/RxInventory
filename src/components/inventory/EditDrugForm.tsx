@@ -22,6 +22,7 @@ import { CheckCircle } from 'lucide-react';
 
 const editDrugFormSchema = z.object({
   name: z.string().min(2, { message: "Drug name must be at least 2 characters." }),
+  initialSource: z.string().optional(), // Allow empty string, or can be min(1) if required
   purchasePricePerStrip: z.coerce.number().min(0, { message: "Price must be non-negative." }),
   lowStockThreshold: z.coerce.number().int().min(0, { message: "Threshold must be zero or a positive number." }),
 });
@@ -40,6 +41,7 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
     resolver: zodResolver(editDrugFormSchema),
     defaultValues: {
       name: drug.name,
+      initialSource: drug.initialSource || '',
       purchasePricePerStrip: drug.purchasePricePerStrip,
       lowStockThreshold: drug.lowStockThreshold,
     },
@@ -86,6 +88,19 @@ export default function EditDrugForm({ drug, onSaveSuccess, onCancel }: EditDrug
               <FormLabel>Drug Name</FormLabel>
               <FormControl>
                 <Input placeholder="Enter drug name" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="initialSource"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Initial Source</FormLabel>
+              <FormControl>
+                <Input placeholder="Enter initial source (e.g., supplier)" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

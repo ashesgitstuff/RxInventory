@@ -95,7 +95,7 @@ export default function ManageDrugsPage() {
             <DialogHeader>
               <DialogTitle>Edit Drug: {selectedDrug.name}</DialogTitle>
               <DialogDescription>
-                Make changes to the drug details below. Click save when you're done. The initial source cannot be changed.
+                Make changes to the drug details below. Click save when you're done.
               </DialogDescription>
             </DialogHeader>
             <EditDrugForm
@@ -105,7 +105,7 @@ export default function ManageDrugsPage() {
             />
              <div className="mt-2 p-3 bg-muted/50 rounded-md text-xs text-muted-foreground flex items-start gap-2">
                 <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>The 'Initial Source' of a drug is set when it's first added to the inventory (usually during a restock of a new drug type) and cannot be modified here.</span>
+                <span>The 'Initial Source' field indicates where the drug was first logged from. You can update this if needed.</span>
             </div>
           </DialogContent>
         </Dialog>

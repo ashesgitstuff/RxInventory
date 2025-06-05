@@ -19,8 +19,8 @@ interface InventoryContextType {
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_DRUGS_KEY = 'rxinventory_drugs_v6'; // Incremented version due to structure change
-const LOCAL_STORAGE_TRANSACTIONS_KEY = 'rxinventory_transactions_v5'; // Incremented version
+const LOCAL_STORAGE_DRUGS_KEY = 'rxinventory_drugs_v7'; // Incremented version due to structure change
+const LOCAL_STORAGE_TRANSACTIONS_KEY = 'rxinventory_transactions_v6'; // Incremented version
 
 export const InventoryProvider = ({ children }: { children: ReactNode }) => {
   const [drugs, setDrugs] = useState<Drug[]>(() => {
@@ -177,7 +177,6 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
       let currentDrugIndex = -1;
 
       if (item.drugId === '--add-new--' && item.newDrugDetails) {
-        // This logic assumes the form-level validation for duplicates has passed
         const newDrug: Drug = {
           id: item.newDrugDetails.name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
           name: item.newDrugDetails.name,
@@ -198,7 +197,6 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
         }
         drugName = tempDrugs[currentDrugIndex].name;
 
-        // Handle price update for existing drug
         if (item.updatedPurchasePricePerStrip !== undefined && tempDrugs[currentDrugIndex].purchasePricePerStrip !== item.updatedPurchasePricePerStrip) {
           const oldPrice = tempDrugs[currentDrugIndex].purchasePricePerStrip;
           tempDrugs[currentDrugIndex].purchasePricePerStrip = item.updatedPurchasePricePerStrip;
@@ -248,21 +246,20 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, message: "Drug not found." };
     }
 
-    // Check for name uniqueness only if the name is actually changing
     if (data.name && data.name.toLowerCase() !== drugs[drugIndex].name.toLowerCase()) {
       const existingDrugWithNewName = getDrugByName(data.name);
-      // Ensure the found drug is not the same drug we are editing
       if (existingDrugWithNewName && existingDrugWithNewName.id !== drugId) { 
         return { success: false, message: `A drug named "${data.name}" already exists.` };
       }
     }
     
     const oldDrug = drugs[drugIndex];
-    const updatedDrugData = {
+    const updatedDrugData: Drug = {
       ...oldDrug,
       name: data.name ?? oldDrug.name,
       purchasePricePerStrip: data.purchasePricePerStrip ?? oldDrug.purchasePricePerStrip,
       lowStockThreshold: data.lowStockThreshold ?? oldDrug.lowStockThreshold,
+      initialSource: data.initialSource !== undefined ? data.initialSource : oldDrug.initialSource,
     };
 
     const updatedDrugsList = [...drugs];
@@ -274,6 +271,7 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
       drugName: updatedDrugData.name, 
     };
     let detailsChanged = false;
+
     if (data.name && data.name !== oldDrug.name) {
       transactionUpdateDetails.previousName = oldDrug.name;
       transactionUpdateDetails.newName = data.name;
@@ -287,6 +285,11 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
     if (data.lowStockThreshold !== undefined && data.lowStockThreshold !== oldDrug.lowStockThreshold) {
       transactionUpdateDetails.previousThreshold = oldDrug.lowStockThreshold;
       transactionUpdateDetails.newThreshold = data.lowStockThreshold;
+      detailsChanged = true;
+    }
+    if (data.initialSource !== undefined && data.initialSource !== oldDrug.initialSource) {
+      transactionUpdateDetails.previousSource = oldDrug.initialSource;
+      transactionUpdateDetails.newSource = data.initialSource;
       detailsChanged = true;
     }
 
@@ -327,4 +330,3 @@ export const useInventory = (): InventoryContextType => {
   }
   return context;
 };
-

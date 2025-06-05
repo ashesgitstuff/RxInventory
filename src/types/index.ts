@@ -78,6 +78,8 @@ export interface Transaction {
     newPrice?: number;
     previousThreshold?: number;
     newThreshold?: number;
+    previousSource?: string;
+    newSource?: string;
   };
 }
 
@@ -85,5 +87,5 @@ export interface EditDrugFormData {
   name: string;
   purchasePricePerStrip: number;
   lowStockThreshold: number;
+  initialSource?: string;
 }
-
