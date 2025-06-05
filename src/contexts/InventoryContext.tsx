@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Drug, Transaction, TransactionDrugDetail, EditDrugFormData, DrugRestockEntry, Village, DispenseFormData, DrugDispenseEntry, GroupedDrugDisplay, NewDrugDetails } from '@/types';
-import { DEFAULT_PURCHASE_PRICE, DEFAULT_DRUG_LOW_STOCK_THRESHOLD } from '@/types';
+import { INITIAL_DRUGS, DEFAULT_PURCHASE_PRICE, DEFAULT_DRUG_LOW_STOCK_THRESHOLD } from '@/types'; // Import INITIAL_DRUGS
 import { parseISO, compareAsc, format } from 'date-fns';
 
 const DRUGS_STORAGE_KEY = 'chotusdrugbus_drugs_v3';
@@ -25,6 +25,7 @@ interface InventoryContextType {
   getDrugById: (drugId: string) => Drug | undefined;
   getDrugGroupsForDisplay: () => GroupedDrugDisplay[];
   getVillages: () => Village[];
+  resetInventoryData: () => void; // Added reset function
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -36,25 +37,32 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     try {
       const storedDrugs = localStorage.getItem(DRUGS_STORAGE_KEY);
       if (storedDrugs) {
         setDrugs(JSON.parse(storedDrugs));
+      } else {
+        setDrugs(INITIAL_DRUGS); // Initialize with default if nothing in storage
       }
       const storedTransactions = localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
       if (storedTransactions) {
         setTransactions(JSON.parse(storedTransactions));
+      } else {
+        setTransactions([]);
       }
       const storedVillages = localStorage.getItem(VILLAGES_STORAGE_KEY);
       if (storedVillages) {
         setVillages(JSON.parse(storedVillages));
+      } else {
+        setVillages([]);
       }
     } catch (error) {
       console.error("Error loading data from localStorage:", error);
       localStorage.removeItem(DRUGS_STORAGE_KEY);
       localStorage.removeItem(TRANSACTIONS_STORAGE_KEY);
       localStorage.removeItem(VILLAGES_STORAGE_KEY);
-      setDrugs([]);
+      setDrugs(INITIAL_DRUGS);
       setTransactions([]);
       setVillages([]);
     }
@@ -115,6 +123,7 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
   const getDrugGroupsForDisplay = useCallback((): GroupedDrugDisplay[] => {
     const groups: Record<string, GroupedDrugDisplay> = {};
     drugs.forEach(drug => {
+      // Consistent key: genericName-brandName-dosage
       const groupKey = `${drug.name.toLowerCase()}-DELIMITER-${(drug.brandName || '').toLowerCase()}-DELIMITER-${(drug.dosage || '').toLowerCase()}`;
       
       let displayNameSegments: string[] = [];
@@ -135,18 +144,22 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
           brandName: drug.brandName,
           dosage: drug.dosage,
           totalStock: 0,
+          // Use the threshold of the first batch in the group for the aggregate warning
+          // This remains an approximation; a more complex system could average or take max.
           lowStockThreshold: drug.lowStockThreshold, 
           batches: [],
         };
       }
       groups[groupKey].totalStock += drug.stock;
       groups[groupKey].batches.push(drug);
+      // Sort batches within the group by expiry date (earliest first)
       groups[groupKey].batches.sort((a, b) => {
         const dateA = a.dateOfExpiry ? parseISO(a.dateOfExpiry).getTime() : Infinity;
         const dateB = b.dateOfExpiry ? parseISO(b.dateOfExpiry).getTime() : Infinity;
         return dateA - dateB; 
       });
     });
+    // Sort the final list of groups by display name
     return Object.values(groups).sort((a,b) => a.displayName.localeCompare(b.displayName));
   }, [drugs]);
 
@@ -172,13 +185,14 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
             continue;
         }
 
+        // Find all batches matching the drug type (generic name, brand name, dosage)
         const matchingBatches = updatedDrugsState.filter(d =>
           d.name.toLowerCase() === reqGenericName.toLowerCase() &&
           (d.brandName || '').toLowerCase() === (reqBrandName || '').toLowerCase() && 
           (d.dosage || '').toLowerCase() === (reqDosage || '').toLowerCase() && 
-          d.stock > 0
-        ).sort((a, b) => { 
-          const dateA = a.dateOfExpiry ? parseISO(a.dateOfExpiry) : new Date(8640000000000000); 
+          d.stock > 0 // Only consider batches with stock
+        ).sort((a, b) => { // Sort by expiry date, earliest first
+          const dateA = a.dateOfExpiry ? parseISO(a.dateOfExpiry) : new Date(8640000000000000); // Treat no expiry as very far in future
           const dateB = b.dateOfExpiry ? parseISO(b.dateOfExpiry) : new Date(8640000000000000);
           return compareAsc(dateA, dateB);
         });
@@ -193,16 +207,17 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
         if (totalStockForDrugType < stripsToDispense) {
           overallSuccess = false;
           overallMessage += `Not enough stock for ${reqGenericName} ${reqBrandName || ''} ${reqDosage || ''}. Available: ${totalStockForDrugType}, Requested: ${stripsToDispense}. Dispensing available. `;
-          stripsToDispense = totalStockForDrugType; 
-          if (stripsToDispense === 0) continue;
+          stripsToDispense = totalStockForDrugType; // Adjust to dispense only what's available
+          if (stripsToDispense === 0) continue; // Nothing to dispense if adjusted to zero
         }
         
         let dispensedThisItem = 0;
         for (const batch of matchingBatches) {
-          if (stripsToDispense === 0) break;
+          if (stripsToDispense === 0) break; // All requested strips for this item have been dispensed
 
+          // Find the index of this batch in the main `updatedDrugsState` array to modify it
           const batchIndexInUpdatedState = updatedDrugsState.findIndex(d => d.id === batch.id);
-          if (batchIndexInUpdatedState === -1) continue; 
+          if (batchIndexInUpdatedState === -1) continue; // Should not happen if logic is correct
 
           const currentBatchInState = updatedDrugsState[batchIndexInUpdatedState];
           const originalStock = currentBatchInState.stock;
@@ -219,7 +234,7 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
             brandName: currentBatchInState.brandName,
             dosage: currentBatchInState.dosage,
             batchNumber: currentBatchInState.batchNumber,
-            quantity: -dispensableFromThisBatch, 
+            quantity: -dispensableFromThisBatch, // Negative for dispense
             previousStock: originalStock,
             newStock: currentBatchInState.stock,
           });
@@ -232,14 +247,15 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
            });
         }
         
-        if (stripsToDispense > 0 && request.stripsDispensed > 0 && dispensedThisItem < request.stripsDispensed) { 
-            overallSuccess = false; 
+        if (stripsToDispense > 0 && request.stripsDispensed > 0 && dispensedThisItem < request.stripsDispensed) { // If some strips couldn't be dispensed for this item
+            overallSuccess = false; // Mark overall success as false due to partial dispense
+            // Add a specific message for this item if not already present
             if (!overallMessage.includes(`Partially dispensed for ${reqGenericName}`)) {
                  overallMessage += `Partially dispensed for ${reqGenericName} ${reqBrandName || ''} ${reqDosage || ''}. `;
             }
         }
       }
-      return updatedDrugsState; 
+      return updatedDrugsState; // Return the modified copy
     });
 
     if (transactionDrugDetailsAccumulator.length > 0) {
@@ -254,6 +270,7 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
         notes: overallMessage || 'Dispense operation completed.',
       });
     } else if (!overallSuccess && overallMessage.length === 0) {
+        // This case might happen if all requested items had zero quantity or no stock at all
         overallMessage = "No drugs were dispensed. Check stock or request details."
     }
 
@@ -272,16 +289,15 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
     message?: string;
     restockedDrugs: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }>;
   }> => {
-    const newDrugsStateAfterProcessing: Drug[] = [...drugs]; // Start with a copy of the current state
-    const transactionDetailsForLog: TransactionDrugDetail[] = [];
+    const newDrugsStateSnapshot: Drug[] = [...drugs]; 
+    const transactionDetailsForMainLog: TransactionDrugDetail[] = [];
     const restockedDrugsInfoForReturn: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }> = [];
     const priceUpdateTransactionsToLog: Array<Omit<Transaction, 'id' | 'timestamp'>> = [];
 
     drugsToRestockItems.forEach(item => {
       if (item.drugId === '--add-new--' && item.newDrugDetails) {
         const nd = item.newDrugDetails;
-        // Basic check, form should also validate this
-        const existingBatchCheck = newDrugsStateAfterProcessing.find(d =>
+        const existingBatchCheck = newDrugsStateSnapshot.find(d =>
             d.name.toLowerCase() === nd.name.toLowerCase() &&
             (d.brandName || '').toLowerCase() === (nd.brandName || '').toLowerCase() &&
             (d.dosage || '').toLowerCase() === (nd.dosage || '').toLowerCase() &&
@@ -289,8 +305,7 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
         );
         if (existingBatchCheck) {
           console.warn(`Attempted to add a new batch that already exists: ${nd.name} ${nd.batchNumber} during processing.`);
-          // Optionally, you could add to overallMessage if this function returned one, or throw
-          return; // Skip this item if it's a duplicate new batch based on current processing
+          return; 
         }
 
         const newDrugBatch: Drug = {
@@ -306,9 +321,9 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
           lowStockThreshold: nd.lowStockThreshold ?? DEFAULT_DRUG_LOW_STOCK_THRESHOLD,
           initialSource: source,
         };
-        newDrugsStateAfterProcessing.push(newDrugBatch);
+        newDrugsStateSnapshot.push(newDrugBatch);
         
-        transactionDetailsForLog.push({
+        transactionDetailsForMainLog.push({
           drugId: newDrugBatch.id, drugName: newDrugBatch.name, brandName: newDrugBatch.brandName,
           dosage: newDrugBatch.dosage, batchNumber: newDrugBatch.batchNumber, quantity: item.stripsAdded,
           previousStock: 0, newStock: item.stripsAdded,
@@ -318,65 +333,58 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
           batchNumber: newDrugBatch.batchNumber, quantity: item.stripsAdded 
         });
 
-      } else { // Existing batch
-        const drugIndex = newDrugsStateAfterProcessing.findIndex(d => d.id === item.drugId);
+      } else { 
+        const drugIndex = newDrugsStateSnapshot.findIndex(d => d.id === item.drugId);
         if (drugIndex !== -1) {
-          const drugBeforeUpdate = newDrugsStateAfterProcessing[drugIndex];
+          const drugBeforeUpdate = {...newDrugsStateSnapshot[drugIndex]}; // Create a shallow copy
           const previousStock = drugBeforeUpdate.stock;
           
-          // Create a new object for the updated batch to ensure React detects the change
-          const updatedBatchData: Drug = {
-            ...drugBeforeUpdate,
-            stock: drugBeforeUpdate.stock + item.stripsAdded,
-          };
+          drugBeforeUpdate.stock += item.stripsAdded;
 
-          if (item.updatedPurchasePricePerStrip !== undefined && item.updatedPurchasePricePerStrip !== updatedBatchData.purchasePricePerStrip) {
-            const oldPrice = updatedBatchData.purchasePricePerStrip;
-            updatedBatchData.purchasePricePerStrip = item.updatedPurchasePricePerStrip;
+          if (item.updatedPurchasePricePerStrip !== undefined && item.updatedPurchasePricePerStrip !== drugBeforeUpdate.purchasePricePerStrip) {
+            const oldPrice = drugBeforeUpdate.purchasePricePerStrip;
+            drugBeforeUpdate.purchasePricePerStrip = item.updatedPurchasePricePerStrip;
             priceUpdateTransactionsToLog.push({
               type: 'update',
               drugs: [], 
-              notes: `Purchase price updated for ${updatedBatchData.brandName || updatedBatchData.name} ${updatedBatchData.dosage || ''} (Batch: ${updatedBatchData.batchNumber}) to INR ${item.updatedPurchasePricePerStrip.toFixed(2)}.`,
+              notes: `Purchase price updated for ${drugBeforeUpdate.brandName || drugBeforeUpdate.name} ${drugBeforeUpdate.dosage || ''} (Batch: ${drugBeforeUpdate.batchNumber}) to INR ${item.updatedPurchasePricePerStrip.toFixed(2)}.`,
               updateDetails: {
-                drugId: updatedBatchData.id,
-                drugName: updatedBatchData.name,
+                drugId: drugBeforeUpdate.id,
+                drugName: drugBeforeUpdate.name,
                 previousPrice: oldPrice,
                 newPrice: item.updatedPurchasePricePerStrip,
-                newBrandName: updatedBatchData.brandName,
-                newDosage: updatedBatchData.dosage,
-                newBatchNumber: updatedBatchData.batchNumber,
+                newBrandName: drugBeforeUpdate.brandName, // for context in log
+                newDosage: drugBeforeUpdate.dosage,       // for context in log
+                newBatchNumber: drugBeforeUpdate.batchNumber, // for context in log
               }
             });
           }
           
-          newDrugsStateAfterProcessing[drugIndex] = updatedBatchData; // Replace with the new object
+          newDrugsStateSnapshot[drugIndex] = drugBeforeUpdate; 
 
-          transactionDetailsForLog.push({
-            drugId: updatedBatchData.id, drugName: updatedBatchData.name, brandName: updatedBatchData.brandName,
-            dosage: updatedBatchData.dosage, batchNumber: updatedBatchData.batchNumber, quantity: item.stripsAdded,
-            previousStock: previousStock, newStock: updatedBatchData.stock,
+          transactionDetailsForMainLog.push({
+            drugId: drugBeforeUpdate.id, drugName: drugBeforeUpdate.name, brandName: drugBeforeUpdate.brandName,
+            dosage: drugBeforeUpdate.dosage, batchNumber: drugBeforeUpdate.batchNumber, quantity: item.stripsAdded,
+            previousStock: previousStock, newStock: drugBeforeUpdate.stock,
           });
           restockedDrugsInfoForReturn.push({ 
-            drugName: updatedBatchData.name, brandName: updatedBatchData.brandName, dosage: updatedBatchData.dosage, 
-            batchNumber: updatedBatchData.batchNumber, quantity: item.stripsAdded 
+            drugName: drugBeforeUpdate.name, brandName: drugBeforeUpdate.brandName, dosage: drugBeforeUpdate.dosage, 
+            batchNumber: drugBeforeUpdate.batchNumber, quantity: item.stripsAdded 
           });
         }
       }
     });
 
-    // Commit the final processed state
-    setDrugs(newDrugsStateAfterProcessing);
+    setDrugs(newDrugsStateSnapshot);
 
-    // Log the main restock transaction
-    if (transactionDetailsForLog.length > 0) {
+    if (transactionDetailsForMainLog.length > 0) {
         addTransaction({
             type: 'restock',
             source: source,
-            drugs: transactionDetailsForLog, // Use the locally built details
+            drugs: transactionDetailsForMainLog, 
             notes: `Restocked from ${source}.`
         });
     }
-    // Log any price update transactions
     priceUpdateTransactionsToLog.forEach(tx => addTransaction(tx));
 
     return { success: true, message: "Stock updated successfully.", restockedDrugs: restockedDrugsInfoForReturn };
@@ -446,6 +454,21 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
     return { success: false, message: 'Failed to find drug to update.' };
   };
 
+  const resetInventoryData = useCallback(() => {
+    setLoading(true);
+    localStorage.removeItem(DRUGS_STORAGE_KEY);
+    localStorage.removeItem(TRANSACTIONS_STORAGE_KEY);
+    localStorage.removeItem(VILLAGES_STORAGE_KEY);
+    
+    setDrugs(INITIAL_DRUGS);
+    setTransactions([]);
+    setVillages([]);
+    // The useEffect hooks for saving to localStorage will pick up these new states
+    setLoading(false); 
+    console.log("Inventory data has been reset to initial defaults.");
+  }, [setDrugs, setTransactions, setVillages, setLoading]);
+
+
   return (
     <InventoryContext.Provider value={{ 
         drugs, 
@@ -458,7 +481,8 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
         updateDrugDetails, 
         getDrugById,
         getDrugGroupsForDisplay,
-        getVillages
+        getVillages,
+        resetInventoryData // Expose the reset function
     }}>
       {children}
     </InventoryContext.Provider>
@@ -472,3 +496,4 @@ export const useInventory = () => {
   }
   return context;
 };
+
