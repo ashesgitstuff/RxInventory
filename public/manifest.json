@@ -1,24 +1,35 @@
 {
-  "name": "ChotusDrugBus",
-  "short_name": "ChotusDB",
+  "name": "FORRADS MMU - Pharmacy Management",
+  "short_name": "RxInventory",
   "description": "Manage your rural health clinic pharmacy inventory efficiently.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ECF0F1",
+  "theme_color": "#111827",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ],
-  "theme_color": "#111827",
-  "background_color": "#111827",
-  "display": "standalone",
-  "scope": "/",
-  "start_url": "/"
+  ]
 }
