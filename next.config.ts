@@ -44,6 +44,7 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   output: 'export',
   assetPrefix: './', // Use relative paths for assets
+  trailingSlash: true, // Ensures directory-like routing for Electron
   typescript: {
     ignoreBuildErrors: false, // Enforce type safety
   },
