@@ -4,11 +4,12 @@ import './globals.css';
 import { InventoryProvider } from '@/contexts/InventoryContext';
 import Header from '@/components/layout/Header';
 import { Toaster } from "@/components/ui/toaster";
+import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 
 export const metadata: Metadata = {
   title: 'FORRADS MMU - Pharmacy Management',
   description: 'Manage your rural health clinic pharmacy inventory efficiently.',
-  // manifest: '/manifest.json', // Removed to let next-pwa handle it
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
@@ -26,6 +27,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased bg-background text-foreground min-h-screen flex flex-col">
         <InventoryProvider>
+          <ServiceWorkerRegistration />
           <Header />
           <main className="flex-grow container mx-auto px-4 py-8">
             {children}

@@ -5,20 +5,48 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 
 const withPWA = withPWAInit({
   dest: 'public',
-  register: true,
+  register: false, // We handle registration manually
   skipWaiting: true,
-  disable: isDevelopment, // Disable PWA in development for faster reloads, enable for prod builds
-  // swSrc: 'service-worker.js', // if you have a custom service worker
+  disable: isDevelopment,
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'google-fonts-cache',
+        expiration: {
+          maxEntries: 10,
+          maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    {
+      urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'gstatic-fonts-cache',
+        expiration: {
+          maxEntries: 10,
+          maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+  ],
 });
 
 const nextConfig: NextConfig = {
-  /* config options here */
   output: 'export',
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false, // Enforce type safety
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false, // Enforce code quality
   },
   images: {
     remotePatterns: [
@@ -29,6 +57,7 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+    unoptimized: true, // Required for static export with next/image
   },
 };
 
