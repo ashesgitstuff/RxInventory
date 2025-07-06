@@ -8,33 +8,38 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
-  { href: '/dispense', label: 'Dispense Drugs', icon: MinusCircle },
-  { href: '/restock', label: 'Restock', icon: PackagePlus },
-  { href: '/', label: 'Dashboard', icon: LayoutGrid },
-  { href: '/manage-drugs', label: 'Manage Drugs', icon: EditIcon },
-  { href: '/transactions', label: 'Transactions', icon: ListChecks },
-  { href: '/camps', label: 'Camps', icon: Tent },
+  { href: '/dispense.html', label: 'Dispense Drugs', icon: MinusCircle },
+  { href: '/restock.html', label: 'Restock', icon: PackagePlus },
+  { href: '/index.html', label: 'Dashboard', icon: LayoutGrid },
+  { href: '/manage-drugs.html', label: 'Manage Drugs', icon: EditIcon },
+  { href: '/transactions.html', label: 'Transactions', icon: ListChecks },
+  { href: '/camps.html', label: 'Camps', icon: Tent },
 ];
 
 export default function Header() {
   const pathname = usePathname();
 
+  const isCurrentPage = (href: string) => {
+    if (href === '/index.html' && pathname === '/') return true;
+    return pathname === href;
+  }
+
   return (
     <header className="bg-card border-b border-border shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-xl font-headline font-bold text-primary">
+        <Link href="/index.html" className="flex items-center gap-2 text-xl font-headline font-bold text-primary">
           <span>FORRADS MMU</span>
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2">
           {navItems.map((item) => (
             <Button
               key={item.href}
-              variant={pathname === item.href ? 'default' : 'ghost'}
+              variant={isCurrentPage(item.href) ? 'default' : 'ghost'}
               size="sm"
               asChild
               className={cn(
                 "transition-colors duration-200",
-                pathname === item.href 
+                isCurrentPage(item.href)
                   ? "bg-primary text-primary-foreground hover:bg-primary/90" 
                   : "text-foreground hover:bg-primary/10 hover:text-primary"
               )}

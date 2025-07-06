@@ -3,7 +3,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'export',
-  trailingSlash: true, // Ensures directory-like routing for Electron
+  assetPrefix: './', // Use relative paths for assets
   typescript: {
     ignoreBuildErrors: false, // Enforce type safety
   },

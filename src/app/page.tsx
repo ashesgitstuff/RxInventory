@@ -160,10 +160,10 @@ export default function DashboardPage() {
       
       <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
         <Button size="lg" asChild className="shadow-md hover:shadow-lg transition-shadow">
-          <Link href="/dispense">Dispense Drugs</Link>
+          <Link href="/dispense.html">Dispense Drugs</Link>
         </Button>
         <Button size="lg" variant="outline" asChild className="shadow-md hover:shadow-lg transition-shadow">
-          <Link href="/restock">Restock Inventory</Link>
+          <Link href="/restock.html">Restock Inventory</Link>
         </Button>
       </div>
 
