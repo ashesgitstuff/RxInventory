@@ -389,66 +389,57 @@ const dispenseDrugs = async (
   };
 
   const updateDrugDetails = async (drugId: string, data: EditDrugFormData): Promise<{ success: boolean; message?: string; updatedDrug?: Drug }> => {
-    let updatedDrugInstance: Drug | undefined = undefined;
-    let previousDetails: Partial<Drug> = {};
+    const previousDrug = drugs.find(d => d.id === drugId);
 
-    setDrugs(prevDrugs => {
-      const updatedDrugs = prevDrugs.map(drug => {
-        if (drug.id === drugId) {
-          previousDetails = { ...drug }; 
+    if (!previousDrug) {
+        return { success: false, message: 'Failed to find drug to update.' };
+    }
 
-          updatedDrugInstance = {
-            ...drug, 
-            name: data.name,
-            brandName: data.brandName,
-            dosage: data.dosage,
-            batchNumber: data.batchNumber,
-            dateOfManufacture: data.dateOfManufacture,
-            dateOfExpiry: data.dateOfExpiry,
-            purchasePricePerStrip: data.purchasePricePerStrip,
-            lowStockThreshold: data.lowStockThreshold,
-            initialSource: data.initialSource || drug.initialSource,
-          };
-          return updatedDrugInstance;
+    const updatedDrug: Drug = {
+        ...previousDrug,
+        name: data.name,
+        brandName: data.brandName,
+        dosage: data.dosage,
+        batchNumber: data.batchNumber,
+        dateOfManufacture: data.dateOfManufacture,
+        dateOfExpiry: data.dateOfExpiry,
+        purchasePricePerStrip: data.purchasePricePerStrip,
+        lowStockThreshold: data.lowStockThreshold,
+        initialSource: data.initialSource || previousDrug.initialSource,
+    };
+
+    const newDrugs = drugs.map(d => (d.id === drugId ? updatedDrug : d));
+    setDrugs(newDrugs);
+
+    addTransaction({
+        type: 'update',
+        drugs: [], 
+        notes: `Details updated for batch: ${updatedDrug.brandName || updatedDrug.name} ${updatedDrug.dosage || ''} (Batch: ${updatedDrug.batchNumber}).`,
+        updateDetails: {
+            drugId: updatedDrug.id,
+            drugName: updatedDrug.name, 
+            previousName: previousDrug.name !== updatedDrug.name ? previousDrug.name : undefined,
+            newName: previousDrug.name !== updatedDrug.name ? updatedDrug.name : undefined,
+            previousBrandName: previousDrug.brandName !== updatedDrug.brandName ? previousDrug.brandName : undefined,
+            newBrandName: previousDrug.brandName !== updatedDrug.brandName ? updatedDrug.brandName : undefined,
+            previousDosage: previousDrug.dosage !== updatedDrug.dosage ? previousDrug.dosage : undefined,
+            newDosage: previousDrug.dosage !== updatedDrug.dosage ? updatedDrug.dosage : undefined,
+            previousBatchNumber: previousDrug.batchNumber !== updatedDrug.batchNumber ? previousDrug.batchNumber : undefined,
+            newBatchNumber: previousDrug.batchNumber !== updatedDrug.batchNumber ? updatedDrug.batchNumber : undefined,
+            previousDateOfManufacture: previousDrug.dateOfManufacture !== updatedDrug.dateOfManufacture ? previousDrug.dateOfManufacture : undefined,
+            newDateOfManufacture: previousDrug.dateOfManufacture !== updatedDrug.dateOfManufacture ? updatedDrug.dateOfManufacture : undefined,
+            previousDateOfExpiry: previousDrug.dateOfExpiry !== updatedDrug.dateOfExpiry ? previousDrug.dateOfExpiry : undefined,
+            newDateOfExpiry: previousDrug.dateOfExpiry !== updatedDrug.dateOfExpiry ? updatedDrug.dateOfExpiry : undefined,
+            previousPrice: previousDrug.purchasePricePerStrip !== updatedDrug.purchasePricePerStrip ? previousDrug.purchasePricePerStrip : undefined,
+            newPrice: previousDrug.purchasePricePerStrip !== updatedDrug.purchasePricePerStrip ? updatedDrug.purchasePricePerStrip : undefined,
+            previousThreshold: previousDrug.lowStockThreshold !== updatedDrug.lowStockThreshold ? previousDrug.lowStockThreshold : undefined,
+            newThreshold: previousDrug.lowStockThreshold !== updatedDrug.lowStockThreshold ? updatedDrug.lowStockThreshold : undefined,
+            previousSource: previousDrug.initialSource !== updatedDrug.initialSource ? previousDrug.initialSource : undefined,
+            newSource: previousDrug.initialSource !== updatedDrug.initialSource ? updatedDrug.initialSource : undefined,
         }
-        return drug;
-      });
-      return updatedDrugs;
     });
 
-    if (updatedDrugInstance && previousDetails.id) { 
-        const ud = updatedDrugInstance;
-        const pd = previousDetails;
-        addTransaction({
-            type: 'update',
-            drugs: [], 
-            notes: `Details updated for batch: ${ud.brandName || ud.name} ${ud.dosage || ''} (Batch: ${ud.batchNumber}).`,
-            updateDetails: {
-                drugId: ud.id,
-                drugName: ud.name, 
-                previousName: pd.name !== ud.name ? pd.name : undefined,
-                newName: pd.name !== ud.name ? ud.name : undefined,
-                previousBrandName: pd.brandName !== ud.brandName ? pd.brandName : undefined,
-                newBrandName: pd.brandName !== ud.brandName ? ud.brandName : undefined,
-                previousDosage: pd.dosage !== ud.dosage ? pd.dosage : undefined,
-                newDosage: pd.dosage !== ud.dosage ? ud.dosage : undefined,
-                previousBatchNumber: pd.batchNumber !== ud.batchNumber ? pd.batchNumber : undefined,
-                newBatchNumber: pd.batchNumber !== ud.batchNumber ? ud.batchNumber : undefined,
-                previousDateOfManufacture: pd.dateOfManufacture !== ud.dateOfManufacture ? pd.dateOfManufacture : undefined,
-                newDateOfManufacture: pd.dateOfManufacture !== ud.dateOfManufacture ? ud.dateOfManufacture : undefined,
-                previousDateOfExpiry: pd.dateOfExpiry !== ud.dateOfExpiry ? pd.dateOfExpiry : undefined,
-                newDateOfExpiry: pd.dateOfExpiry !== ud.dateOfExpiry ? ud.dateOfExpiry : undefined,
-                previousPrice: pd.purchasePricePerStrip !== ud.purchasePricePerStrip ? pd.purchasePricePerStrip : undefined,
-                newPrice: pd.purchasePricePerStrip !== ud.purchasePricePerStrip ? ud.purchasePricePerStrip : undefined,
-                previousThreshold: pd.lowStockThreshold !== ud.lowStockThreshold ? pd.lowStockThreshold : undefined,
-                newThreshold: pd.lowStockThreshold !== ud.lowStockThreshold ? ud.lowStockThreshold : undefined,
-                previousSource: pd.initialSource !== ud.initialSource ? pd.initialSource : undefined,
-                newSource: pd.initialSource !== ud.initialSource ? ud.initialSource : undefined,
-            }
-        });
-      return { success: true, message: 'Drug details updated successfully.', updatedDrug: updatedDrugInstance };
-    }
-    return { success: false, message: 'Failed to find drug to update.' };
+    return { success: true, message: 'Drug details updated successfully.', updatedDrug: updatedDrug };
   };
 
   const deleteDrugBatch = async (drugId: string): Promise<{ success: boolean; message?: string; deletedDrugName?: string }> => {
