@@ -2,9 +2,20 @@
 
 import { useEffect } from 'react';
 
+declare global {
+  interface Window {
+    electron?: {
+      isElectron: boolean;
+    };
+  }
+}
+
 const ServiceWorkerRegistration = () => {
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
+    const isElectronApp = typeof window !== 'undefined' && window.electron?.isElectron;
+
+    // Only register the service worker if not in an Electron app
+    if (!isElectronApp && 'serviceWorker' in navigator) {
       window.addEventListener('load', function () {
         navigator.serviceWorker
           .register('/sw.js')

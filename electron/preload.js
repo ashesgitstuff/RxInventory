@@ -6,7 +6,5 @@ const { contextBridge } = require('electron');
 // The contextBridge is used to securely expose specific functions to the
 // renderer process (your web app) without leaking Node.js globals.
 contextBridge.exposeInMainWorld('electron', {
-  // Add any functions you want to expose to your Next.js app here.
-  // For example:
-  // getAppName: () => app.getName(),
+  isElectron: true,
 });
