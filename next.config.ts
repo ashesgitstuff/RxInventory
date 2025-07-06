@@ -43,6 +43,7 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   output: 'export',
+  assetPrefix: './', // Use relative paths for assets
   typescript: {
     ignoreBuildErrors: false, // Enforce type safety
   },
