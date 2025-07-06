@@ -256,7 +256,7 @@ export default function ExportDataDialog({
                   mode="single"
                   selected={endDate}
                   onSelect={setEndDate}
-                  disabled={(date) => startDate && date < startOfDay(startDate)}
+                  disabled={(date) => !!(startDate && date < startOfDay(startDate))}
                 />
               </PopoverContent>
             </Popover>
