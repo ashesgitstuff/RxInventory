@@ -383,7 +383,7 @@ export default function RestockForm() {
                                         {...field}
                                         value={field.value ?? ''}
                                         onBlur={(e) => {
-                                            field.onBlur(e); 
+                                            field.onBlur(); 
                                             handleGenericNameBlur(index, e.target.value);
                                         }}
                                     />
