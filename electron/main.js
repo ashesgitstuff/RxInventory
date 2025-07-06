@@ -1,8 +1,9 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
-const isDev = require('electron-is-dev');
 
 function createWindow() {
+  const isDev = !app.isPackaged;
+
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
