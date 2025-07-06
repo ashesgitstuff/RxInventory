@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Drug, Transaction, TransactionDrugDetail, EditDrugFormData, DrugRestockEntry, Village, DispenseFormData, DrugDispenseEntry, GroupedDrugDisplay, NewDrugDetails } from '@/types';
 import { INITIAL_DRUGS, DEFAULT_PURCHASE_PRICE, DEFAULT_DRUG_LOW_STOCK_THRESHOLD } from '@/types'; 
-import { parseISO, compareAsc, format } from 'date-fns';
+import { parseISO, compareAsc, format, isValid } from 'date-fns';
 
 const DRUGS_STORAGE_KEY = 'forradsmmu_drugs_v1';
 const TRANSACTIONS_STORAGE_KEY = 'forradsmmu_transactions_v1';
@@ -163,8 +163,8 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
       groups[groupKey].totalStock += drug.stock;
       groups[groupKey].batches.push(drug);
       groups[groupKey].batches.sort((a, b) => {
-        const dateA = a.dateOfExpiry ? parseISO(a.dateOfExpiry).getTime() : Infinity;
-        const dateB = b.dateOfExpiry ? parseISO(b.dateOfExpiry).getTime() : Infinity;
+        const dateA = a.dateOfExpiry ? new Date(a.dateOfExpiry).getTime() : Infinity;
+        const dateB = b.dateOfExpiry ? new Date(b.dateOfExpiry).getTime() : Infinity;
         return dateA - dateB; 
       });
     });
@@ -172,6 +172,16 @@ export const InventoryProvider = ({ children }: { children: ReactNode }) => {
   }, [drugs]);
 
 const getBatchesForDispenseDisplay = useCallback((): BatchForDispenseDisplay[] => {
+  const safeGetTime = (dateString?: string): number => {
+    if (!dateString) return 0;
+    try {
+        const date = parseISO(dateString);
+        return isValid(date) ? date.getTime() : 0;
+    } catch (e) {
+        return 0;
+    }
+  };
+
   return drugs
     .filter(batch => batch.stock > 0)
     .map(batch => {
@@ -205,8 +215,8 @@ const getBatchesForDispenseDisplay = useCallback((): BatchForDispenseDisplay[] =
       if ((a.brandName || '').toLowerCase() > (b.brandName || '').toLowerCase()) return 1;
       if ((a.dosage || '').toLowerCase() < (b.dosage || '').toLowerCase()) return -1;
       if ((a.dosage || '').toLowerCase() > (b.dosage || '').toLowerCase()) return 1;
-      const dateAValue = a.dateOfExpiry ? parseISO(a.dateOfExpiry).getTime() : 0;
-      const dateBValue = b.dateOfExpiry ? parseISO(b.dateOfExpiry).getTime() : 0;
+      const dateAValue = safeGetTime(a.dateOfExpiry);
+      const dateBValue = safeGetTime(b.dateOfExpiry);
       return dateAValue - dateBValue;
     });
 }, [drugs]);
@@ -390,7 +400,6 @@ const dispenseDrugs = async (
 
   const updateDrugDetails = async (drugId: string, data: EditDrugFormData): Promise<{ success: boolean; message?: string; updatedDrug?: Drug }> => {
     const previousDrug = drugs.find(d => d.id === drugId);
-
     if (!previousDrug) {
         return { success: false, message: 'Failed to find drug to update.' };
     }
@@ -407,17 +416,17 @@ const dispenseDrugs = async (
         lowStockThreshold: data.lowStockThreshold,
         initialSource: data.initialSource || previousDrug.initialSource,
     };
-
+    
     const newDrugs = drugs.map(d => (d.id === drugId ? updatedDrug : d));
     setDrugs(newDrugs);
 
     addTransaction({
         type: 'update',
-        drugs: [], 
+        drugs: [],
         notes: `Details updated for batch: ${updatedDrug.brandName || updatedDrug.name} ${updatedDrug.dosage || ''} (Batch: ${updatedDrug.batchNumber}).`,
         updateDetails: {
             drugId: updatedDrug.id,
-            drugName: updatedDrug.name, 
+            drugName: updatedDrug.name,
             previousName: previousDrug.name !== updatedDrug.name ? previousDrug.name : undefined,
             newName: previousDrug.name !== updatedDrug.name ? updatedDrug.name : undefined,
             previousBrandName: previousDrug.brandName !== updatedDrug.brandName ? previousDrug.brandName : undefined,
