@@ -32,6 +32,8 @@ const dispenseFormSchema = z.object({
   patientName: z.string().min(2, { message: "Patient name must be at least 2 characters." }),
   aadharLastFour: z.string().length(4, {message: "Aadhar must be 4 digits."}).regex(/^\d{4}$/, "Must be 4 digits."),
   age: z.coerce.number().int().positive({ message: "Age must be a positive number." }),
+  sex: z.enum(['Male', 'Female', 'Other']).optional(),
+  villageName: z.string().optional(),
   drugsToDispense: z.array(drugDispenseEntrySchema).min(1, { message: "At least one drug batch must be added to dispense." }),
 });
 
@@ -50,7 +52,7 @@ export default function DispenseForm() {
       patientName: '',
       aadharLastFour: '',
       age: '' as unknown as number, 
-      sex: undefined, // Set to undefined to match the updated schema
+      sex: undefined,
       villageName: '', 
       drugsToDispense: [{ selectedBatchId: '', stripsDispensed: 1 }],
     },
@@ -119,7 +121,7 @@ export default function DispenseForm() {
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Village / Camp Name (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}> 
+                    <Select onValueChange={field.onChange} value={field.value || ''}> 
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select village if applicable" />

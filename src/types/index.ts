@@ -81,7 +81,7 @@ export interface DispenseFormData {
   patientName: string;
   aadharLastFour: string;
   age: number;
-  sex: 'Male' | 'Female' | 'Other' | '';
+  sex?: 'Male' | 'Female' | 'Other';
   villageName?: string;
   drugsToDispense: DrugDispenseEntry[];
 }
