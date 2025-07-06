@@ -1,7 +1,6 @@
 
 "use client";
 
-import Link from 'next/link';
 import { LayoutGrid, MinusCircle, PackagePlus, Edit3 as EditIcon, ListChecks, Tent } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -20,23 +19,21 @@ export default function Header() {
   const pathname = usePathname();
 
   const isCurrentPage = (href: string) => {
-    // Normalize href for comparison
-    const normalizedHref = href.endsWith('index.html') ? '/' : href.replace('./', '/').replace('.html', '');
-    const normalizedPathname = pathname.endsWith('/') ? pathname : `${pathname}/`.replace('//', '/');
-    const simplePathname = pathname.endsWith('index.html') ? '/' : pathname;
-
-    if (href === './index.html' && (simplePathname === '/' || simplePathname === '/index.html')) return true;
-    
-    // Check if the current path contains the link's path
-    return pathname.includes(href.replace('./', '').replace('.html', ''));
-  }
+    const pageName = href.replace('./', '');
+    // In a packaged app, the root pathname might be '/' or end with '/index.html'.
+    if (pageName === 'index.html' && (pathname === '/' || pathname.endsWith('/index.html'))) {
+      return true;
+    }
+    // For other pages, check if the pathname ends with the html file name.
+    return pathname.endsWith(pageName);
+  };
 
   return (
     <header className="bg-card border-b border-border shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="./index.html" className="flex items-center gap-2 text-xl font-headline font-bold text-primary">
+        <a href="./index.html" className="flex items-center gap-2 text-xl font-headline font-bold text-primary">
           <span>FORRADS MMU</span>
-        </Link>
+        </a>
         <nav className="flex items-center gap-1 sm:gap-2">
           {navItems.map((item) => (
             <Button
@@ -51,10 +48,10 @@ export default function Header() {
                   : "text-foreground hover:bg-primary/10 hover:text-primary"
               )}
             >
-              <Link href={item.href} className="flex items-center gap-2">
+              <a href={item.href} className="flex items-center gap-2">
                 <item.icon className="h-4 w-4" />
                 <span className="hidden sm:inline">{item.label}</span>
-              </Link>
+              </a>
             </Button>
           ))}
         </nav>
