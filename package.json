@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "electron:build": "npm run build && electron-builder"
+    "electron:build": "npm run build && electron-builder --win"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.8.0",
