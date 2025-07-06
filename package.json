@@ -5,7 +5,8 @@
   "private": true,
   "main": "electron/main.js",
   "scripts": {
-    "dev": "concurrently \"npm:next-dev\" \"npm:electron-dev\"",
+    "dev": "npm run next-dev",
+    "dev:electron": "concurrently -k \"npm:next-dev\" \"npm:electron-dev\"",
     "next-dev": "next dev --turbopack -p 9002",
     "electron-dev": "wait-on tcp:9002 && electron .",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
