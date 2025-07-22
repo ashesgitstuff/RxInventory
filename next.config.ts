@@ -5,8 +5,6 @@ const nextConfig: NextConfig = {
   output: 'export',
   // Use relative paths for assets to work in file:// protocol
   assetPrefix: './', 
-  // Export pages with .html extension
-  trailingSlash: true,
   typescript: {
     ignoreBuildErrors: false, // Enforce type safety
   },
