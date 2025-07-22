@@ -87,9 +87,9 @@ export default function DashboardPage() {
         <p className="text-xl text-muted-foreground mb-4">No drugs in inventory.</p>
         <p className="text-sm text-muted-foreground mb-6">Your inventory is currently empty. Add some stock to get started!</p>
         <Button asChild>
-          <Link href="/restock">
+          <a href="./restock.html">
             <PlusCircle className="mr-2 h-4 w-4" /> Add Initial Stock
-          </Link>
+          </a>
         </Button>
 
         <div className="mt-12 pt-8 border-t border-border">
@@ -160,10 +160,10 @@ export default function DashboardPage() {
       
       <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
         <Button size="lg" asChild className="shadow-md hover:shadow-lg transition-shadow">
-          <Link href="/dispense">Dispense Drugs</Link>
+          <a href="./dispense.html">Dispense Drugs</a>
         </Button>
         <Button size="lg" variant="outline" asChild className="shadow-md hover:shadow-lg transition-shadow">
-          <Link href="/restock">Restock Inventory</Link>
+          <a href="./restock.html">Restock Inventory</a>
         </Button>
       </div>
 
