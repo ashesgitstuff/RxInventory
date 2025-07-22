@@ -172,7 +172,7 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
                             Exp: {formatDateSafe(batch.dateOfExpiry, 'PP')} {batchDaysToExpiryText}
                         </div>
                         <div>Mfg: {formatDateSafe(batch.dateOfManufacture, 'PP')}</div>
-                        <div>Price/Tablet: INR {batch.purchasePricePerTablet.toFixed(2)}</div>
+                        <div>Price/Tablet: INR {(batch.purchasePricePerTablet ?? 0).toFixed(2)}</div>
                       </li>
                     );
                   })}
