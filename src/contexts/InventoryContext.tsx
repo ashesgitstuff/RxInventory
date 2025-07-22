@@ -35,6 +35,7 @@ interface InventoryContextType {
   updateDrugDetails: (drugId: string, data: EditDrugFormData) => Promise<{ success: boolean; message?: string; updatedDrug?: Drug }>;
   adjustDrugStock: (drugId: string, newStock: number, reason: string) => Promise<{ success: boolean; message?: string }>;
   deleteDrugBatch: (drugId: string) => Promise<{ success: boolean; message?: string; deletedDrugName?: string }>;
+  deleteTransaction: (transactionId: string) => Promise<{ success: boolean; message?: string }>;
   getDrugById: (drugId: string) => Drug | undefined;
   getDrugGroupsForDisplay: () => GroupedDrugDisplay[];
   getBatchesForDispenseDisplay: () => BatchForDispenseDisplay[];
@@ -507,10 +508,55 @@ const dispenseDrugs = async (
     addTransaction({
       type: 'update',
       drugs: [], 
-      notes: `DELETED BATCH: ${deletedDrugName}. Stock at deletion: ${drugToDelete.stock}. Price/tablet: INR ${drugToDelete.purchasePricePerTablet.toFixed(2)}. Exp: ${expiryDateFormatted}.`,
+      notes: `DELETED BATCH: ${deletedDrugName}. Stock at deletion: ${drugToDelete.stock}. Price/tablet: INR ${(drugToDelete.purchasePricePerTablet ?? 0).toFixed(2)}. Exp: ${expiryDateFormatted}.`,
     });
 
     return { success: true, message: `Drug batch "${deletedDrugName}" deleted successfully.`, deletedDrugName };
+  };
+
+  const deleteTransaction = async (transactionId: string): Promise<{ success: boolean; message?: string }> => {
+    const transactionToDelete = transactions.find(t => t.id === transactionId);
+    if (!transactionToDelete) {
+      return { success: false, message: 'Transaction not found.' };
+    }
+  
+    let tempDrugs = [...drugs];
+    let allDrugsFound = true;
+  
+    // Pre-check if all drugs exist
+    for (const detail of transactionToDelete.drugs) {
+      const drugIndex = tempDrugs.findIndex(d => d.id === detail.drugId);
+      if (drugIndex === -1) {
+        allDrugsFound = false;
+        break;
+      }
+    }
+  
+    if (!allDrugsFound) {
+      return { success: false, message: 'Cannot delete transaction: one or more associated drug batches no longer exist.' };
+    }
+  
+    // Apply changes
+    transactionToDelete.drugs.forEach(detail => {
+      const drugIndex = tempDrugs.findIndex(d => d.id === detail.drugId);
+      if (drugIndex !== -1) {
+        // Reverse the operation: subtract the quantity from the transaction
+        // A dispense has negative quantity, so subtracting it adds it back.
+        // A restock has positive quantity, so subtracting it removes it.
+        tempDrugs[drugIndex].stock -= detail.quantity;
+      }
+    });
+  
+    setDrugs(tempDrugs);
+    setTransactions(prev => prev.filter(t => t.id !== transactionId));
+  
+    addTransaction({
+      type: 'update',
+      drugs: [],
+      notes: `DELETED TRANSACTION: Reversed a '${transactionToDelete.type}' transaction (ID: ${transactionToDelete.id}) from ${format(parseISO(transactionToDelete.timestamp), 'PPpp')}.`
+    });
+  
+    return { success: true, message: 'Transaction deleted and inventory updated.' };
   };
 
   const resetInventoryData = useCallback(() => {
@@ -539,6 +585,7 @@ const dispenseDrugs = async (
         updateDrugDetails,
         adjustDrugStock,
         deleteDrugBatch,
+        deleteTransaction,
         getDrugById,
         getDrugGroupsForDisplay,
         getBatchesForDispenseDisplay,
