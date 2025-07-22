@@ -105,7 +105,7 @@ export default function ExportDataDialog({
       // 2. Prepare Transaction Data for Sheet
       const transactionSheetData = filteredTransactions.map(txn => {
         let drugsInvolved = txn.drugs.map(d => 
-          `${d.drugName}${d.brandName ? ` [${d.brandName}]` : ''}${d.dosage ? ` (${d.dosage})` : ''}${d.batchNumber ? ` (Batch: ${d.batchNumber})` : ''}: ${d.quantity > 0 ? '+' : ''}${d.quantity} strips (Prev: ${d.previousStock}, New: ${d.newStock})`
+          `${d.drugName}${d.brandName ? ` [${d.brandName}]` : ''}${d.dosage ? ` (${d.dosage})` : ''}${d.batchNumber ? ` (Batch: ${d.batchNumber})` : ''}: ${d.quantity > 0 ? '+' : ''}${d.quantity} tablets (Prev: ${d.previousStock}, New: ${d.newStock})`
         ).join('; ');
 
         let updateDetailsSummary = '';
@@ -154,8 +154,8 @@ export default function ExportDataDialog({
         'Batch No.': drug.batchNumber || '',
         'Mfg. Date': formatDateOnlyForExcel(drug.dateOfManufacture),
         'Exp. Date': formatDateOnlyForExcel(drug.dateOfExpiry),
-        'Current Stock (Strips)': drug.stock,
-        'Purchase Price/Strip (INR)': drug.purchasePricePerStrip,
+        'Current Stock (Tablets)': drug.stock,
+        'Purchase Price/Tablet (INR)': drug.purchasePricePerTablet,
         'Low Stock Threshold': drug.lowStockThreshold,
         'Initial Source': drug.initialSource || '',
       }));

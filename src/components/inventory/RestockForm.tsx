@@ -34,7 +34,7 @@ const newDrugDetailsSchema = z.object({
   batchNumber: z.string().min(1, { message: "Batch number is required." }),
   dateOfManufacture: z.string().optional().refine(val => !val || !isNaN(Date.parse(val)), { message: "Invalid manufacture date" }),
   dateOfExpiry: z.string().min(1, {message: "Expiry date is required."}).refine(val => !val || !isNaN(Date.parse(val)), { message: "Invalid expiry date" }),
-  purchasePricePerStrip: z.coerce.number().min(0, { message: "Price must be non-negative." }),
+  purchasePricePerTablet: z.coerce.number().min(0, { message: "Price must be non-negative." }),
   lowStockThreshold: z.coerce.number().int().min(0, { message: "Threshold must be zero or positive." }),
 }).refine(data => {
     if (data.dateOfManufacture && data.dateOfExpiry) {
@@ -50,16 +50,16 @@ const newDrugDetailsSchema = z.object({
 
 const drugRestockEntrySchema = z.object({
   drugId: z.string().min(1, { message: "Please select an existing batch or 'Add New Batch'." }), 
-  stripsAdded: z.coerce.number().int().positive({ message: "Strips must be a positive number." }),
+  tabletsAdded: z.coerce.number().int().positive({ message: "Tablets must be a positive number." }),
   newDrugDetails: newDrugDetailsSchema.optional(), 
-  updatedPurchasePricePerStrip: z.coerce.number().min(0, { message: "Price must be non-negative." }).optional(), 
+  updatedPurchasePricePerTablet: z.coerce.number().min(0, { message: "Price must be non-negative." }).optional(), 
 }).refine(data => { 
     if (data.drugId === '--add-new--') {
         return !!data.newDrugDetails &&
                data.newDrugDetails.name.length >=2 &&
                !!data.newDrugDetails.batchNumber &&
                !!data.newDrugDetails.dateOfExpiry &&
-               (data.newDrugDetails.purchasePricePerStrip !== undefined && data.newDrugDetails.purchasePricePerStrip >=0) &&
+               (data.newDrugDetails.purchasePricePerTablet !== undefined && data.newDrugDetails.purchasePricePerTablet >=0) &&
                (data.newDrugDetails.lowStockThreshold !== undefined && data.newDrugDetails.lowStockThreshold >=0);
     }
     return true;
@@ -81,7 +81,7 @@ const getDefaultNewDrugDetails = (): NewDrugDetails => ({
     batchNumber: '',
     dateOfManufacture: '',
     dateOfExpiry: '',
-    purchasePricePerStrip: DEFAULT_PURCHASE_PRICE,
+    purchasePricePerTablet: DEFAULT_PURCHASE_PRICE,
     lowStockThreshold: DEFAULT_DRUG_LOW_STOCK_THRESHOLD
 });
 
@@ -106,9 +106,9 @@ export default function RestockForm() {
       source: '',
       drugsToRestock: [{
         drugId: '',
-        stripsAdded: 10,
+        tabletsAdded: 10,
         newDrugDetails: getDefaultNewDrugDetails(),
-        updatedPurchasePricePerStrip: undefined
+        updatedPurchasePricePerTablet: undefined
       }],
     },
   });
@@ -126,17 +126,17 @@ export default function RestockForm() {
   useEffect(() => {
     let currentGrandTotal = 0;
     watchedDrugsToRestock.forEach((item) => {
-      const strips = Number(item.stripsAdded) || 0;
-      let pricePerStrip = 0;
+      const tablets = Number(item.tabletsAdded) || 0;
+      let pricePerTablet = 0;
       if (item.drugId === '--add-new--' && item.newDrugDetails) {
-        pricePerStrip = Number(item.newDrugDetails.purchasePricePerStrip) || 0;
+        pricePerTablet = Number(item.newDrugDetails.purchasePricePerTablet) || 0;
       } else if (item.drugId !== '--add-new--' && item.drugId !== '') {
         const drugBatch = getDrugById(item.drugId);
-        pricePerStrip = item.updatedPurchasePricePerStrip !== undefined
-                        ? Number(item.updatedPurchasePricePerStrip)
-                        : (drugBatch?.purchasePricePerStrip || 0);
+        pricePerTablet = item.updatedPurchasePricePerTablet !== undefined
+                        ? Number(item.updatedPurchasePricePerTablet)
+                        : (drugBatch?.purchasePricePerTablet || 0);
       }
-      currentGrandTotal += strips * pricePerStrip;
+      currentGrandTotal += tablets * pricePerTablet;
     });
     setGrandTotal(currentGrandTotal);
   }, [watchedDrugsToRestock, getDrugById]);
@@ -149,14 +149,14 @@ export default function RestockForm() {
 
     if (isNew) {
         form.setValue(`drugsToRestock.${index}.newDrugDetails`, getDefaultNewDrugDetails());
-        form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerStrip`, undefined);
+        form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerTablet`, undefined);
     } else {
         form.setValue(`drugsToRestock.${index}.newDrugDetails`, undefined);
         const selectedDrugBatch = getDrugById(value);
-        form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerStrip`, selectedDrugBatch?.purchasePricePerStrip ?? DEFAULT_PURCHASE_PRICE);
+        form.setValue(`drugsToRestock.${index}.updatedPurchasePricePerTablet`, selectedDrugBatch?.purchasePricePerTablet ?? DEFAULT_PURCHASE_PRICE);
     }
     form.trigger(`drugsToRestock.${index}.newDrugDetails`);
-    form.trigger(`drugsToRestock.${index}.updatedPurchasePricePerStrip`);
+    form.trigger(`drugsToRestock.${index}.updatedPurchasePricePerTablet`);
   };
 
   const handleGenericNameBlur = (index: number, typedGenericName: string) => {
@@ -209,9 +209,9 @@ export default function RestockForm() {
         source: '',
         drugsToRestock: [{
             drugId: '',
-            stripsAdded: 10,
+            tabletsAdded: 10,
             newDrugDetails: getDefaultNewDrugDetails(),
-            updatedPurchasePricePerStrip: undefined
+            updatedPurchasePricePerTablet: undefined
         }],
       });
       setFieldStates({});
@@ -229,18 +229,18 @@ export default function RestockForm() {
     const item = form.getValues(`drugsToRestock.${index}`);
     if (!item) return 0;
 
-    const strips = Number(item.stripsAdded) || 0;
-    let pricePerStrip = 0;
+    const tablets = Number(item.tabletsAdded) || 0;
+    let pricePerTablet = 0;
 
     if (item.drugId === '--add-new--' && item.newDrugDetails) {
-      pricePerStrip = Number(item.newDrugDetails.purchasePricePerStrip) || 0;
+      pricePerTablet = Number(item.newDrugDetails.purchasePricePerTablet) || 0;
     } else if (item.drugId && item.drugId !== '--add-new--') {
       const drugBatch = getDrugById(item.drugId);
-      pricePerStrip = item.updatedPurchasePricePerStrip !== undefined
-                      ? Number(item.updatedPurchasePricePerStrip)
-                      : (drugBatch?.purchasePricePerStrip || 0);
+      pricePerTablet = item.updatedPurchasePricePerTablet !== undefined
+                      ? Number(item.updatedPurchasePricePerTablet)
+                      : (drugBatch?.purchasePricePerTablet || 0);
     }
-    return strips * pricePerStrip;
+    return tablets * pricePerTablet;
   };
 
   return (
@@ -321,10 +321,10 @@ export default function RestockForm() {
                   />
                    <FormField
                     control={form.control}
-                    name={`drugsToRestock.${index}.stripsAdded`}
+                    name={`drugsToRestock.${index}.tabletsAdded`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Strips Added / Initial Stock</FormLabel>
+                        <FormLabel>Tablets Added / Initial Stock</FormLabel>
                         <FormControl>
                           <Input type="number" placeholder="Quantity" {...field} min="1" />
                         </FormControl>
@@ -333,11 +333,11 @@ export default function RestockForm() {
                     )}
                   />
                   <FormItem>
-                    <FormLabel>Cost/Strip (INR)</FormLabel>
+                    <FormLabel>Cost/Tablet (INR)</FormLabel>
                     {fieldStates[index]?.isNewBatch ? (
                        <FormField
                             control={form.control}
-                            name={`drugsToRestock.${index}.newDrugDetails.purchasePricePerStrip`}
+                            name={`drugsToRestock.${index}.newDrugDetails.purchasePricePerTablet`}
                             render={({ field }) => (
                                 <FormControl>
                                     <Input type="number" placeholder="Price" {...field} min="0" step="0.01" />
@@ -347,7 +347,7 @@ export default function RestockForm() {
                     ) : (
                         <FormField
                             control={form.control}
-                            name={`drugsToRestock.${index}.updatedPurchasePricePerStrip`}
+                            name={`drugsToRestock.${index}.updatedPurchasePricePerTablet`}
                             render={({ field }) => (
                                 <FormControl>
                                     <Input
@@ -363,8 +363,8 @@ export default function RestockForm() {
                         />
                     )}
                      <FormMessage>
-                        {form.formState.errors.drugsToRestock?.[index]?.newDrugDetails?.purchasePricePerStrip?.message ||
-                         form.formState.errors.drugsToRestock?.[index]?.updatedPurchasePricePerStrip?.message}
+                        {form.formState.errors.drugsToRestock?.[index]?.newDrugDetails?.purchasePricePerTablet?.message ||
+                         form.formState.errors.drugsToRestock?.[index]?.updatedPurchasePricePerTablet?.message}
                     </FormMessage>
                   </FormItem>
                 </div>
@@ -405,8 +405,8 @@ export default function RestockForm() {
                         render={({ field }) => (<FormItem><FormLabel>Expiry Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                     </div>
                      <FormField control={form.control} name={`drugsToRestock.${index}.newDrugDetails.lowStockThreshold`}
-                        render={({ field }) => (<FormItem className="md:col-span-1"><FormLabel>Low Stock Threshold (Strips)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10" {...field} min="0" /></FormControl><FormMessage /></FormItem>)} />
-                    <FormDescription className="text-xs col-span-full">For new batches, ensure Generic Name, Batch No., Expiry, Cost, Threshold, and Strips Added are filled. Brand & Dosage will pre-fill if Generic Name exists.</FormDescription>
+                        render={({ field }) => (<FormItem className="md:col-span-1"><FormLabel>Low Stock Threshold (Tablets)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10" {...field} min="0" /></FormControl><FormMessage /></FormItem>)} />
+                    <FormDescription className="text-xs col-span-full">For new batches, ensure Generic Name, Batch No., Expiry, Cost, Threshold, and Tablets Added are filled. Brand & Dosage will pre-fill if Generic Name exists.</FormDescription>
                   </div>
                 )}
                  <div className="text-right font-semibold mt-2">
@@ -420,9 +420,9 @@ export default function RestockForm() {
               onClick={() => {
                 append({
                     drugId: '',
-                    stripsAdded: 10,
+                    tabletsAdded: 10,
                     newDrugDetails: getDefaultNewDrugDetails(),
-                    updatedPurchasePricePerStrip: undefined
+                    updatedPurchasePricePerTablet: undefined
                   });
                 }}
               className="w-full flex items-center gap-2"

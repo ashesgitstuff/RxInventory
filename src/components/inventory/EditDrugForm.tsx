@@ -28,7 +28,7 @@ const editDrugFormSchema = z.object({
   dateOfManufacture: z.string().optional().refine(val => !val || !isNaN(Date.parse(val)), { message: "Invalid manufacture date" }),
   dateOfExpiry: z.string().min(1, { message: "Expiry date is required." }).refine(val => !val || !isNaN(Date.parse(val)), { message: "Invalid expiry date" }),
   initialSource: z.string().optional(),
-  purchasePricePerStrip: z.coerce.number().min(0, { message: "Price must be non-negative." }),
+  purchasePricePerTablet: z.coerce.number().min(0, { message: "Price must be non-negative." }),
   lowStockThreshold: z.coerce.number().int().min(0, { message: "Threshold must be zero or a positive number." }),
 }).refine(data => {
     if (data.dateOfManufacture && data.dateOfExpiry) {
@@ -62,7 +62,7 @@ export default function EditDrugForm({ drug: drugBatch, onSaveSuccess, onCancel 
       dateOfManufacture: drugBatch.dateOfManufacture || '',
       dateOfExpiry: drugBatch.dateOfExpiry || '',
       initialSource: drugBatch.initialSource || '',
-      purchasePricePerStrip: drugBatch.purchasePricePerStrip,
+      purchasePricePerTablet: drugBatch.purchasePricePerTablet,
       lowStockThreshold: drugBatch.lowStockThreshold,
     },
   });
@@ -205,10 +205,10 @@ export default function EditDrugForm({ drug: drugBatch, onSaveSuccess, onCancel 
             />
             <FormField
             control={form.control}
-            name="purchasePricePerStrip"
+            name="purchasePricePerTablet"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Purchase Price Per Strip (INR)</FormLabel>
+                <FormLabel>Purchase Price Per Tablet (INR)</FormLabel>
                 <FormControl>
                     <Input type="number" placeholder="e.g., 2.50" {...field} min="0" step="0.01" />
                 </FormControl>
@@ -221,7 +221,7 @@ export default function EditDrugForm({ drug: drugBatch, onSaveSuccess, onCancel 
             name="lowStockThreshold"
             render={({ field }) => (
                 <FormItem className="md:col-span-2">
-                <FormLabel>Low Stock Threshold (Strips for this batch)</FormLabel>
+                <FormLabel>Low Stock Threshold (Tablets for this batch)</FormLabel>
                 <FormControl>
                     <Input type="number" placeholder="Enter threshold" {...field} min="0" />
                 </FormControl>

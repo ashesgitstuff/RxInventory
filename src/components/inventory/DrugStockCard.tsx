@@ -104,9 +104,9 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold text-foreground">{totalStock} strips</div>
+        <div className="text-3xl font-bold text-foreground">{totalStock} tablets</div>
         <p className="text-xs text-muted-foreground">
-          {isLowStock ? `Stock is low (Threshold: ${lowStockThreshold})` : `Threshold: ${lowStockThreshold} strips`}
+          {isLowStock ? `Stock is low (Threshold: ${lowStockThreshold})` : `Threshold: ${lowStockThreshold} tablets`}
         </p>
         <Progress 
           value={stockPercentage} 
@@ -144,7 +144,7 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
               <div className="space-y-2">
                 <h4 className="font-medium leading-none">{displayName} - Batch Details</h4>
                 <p className="text-sm text-muted-foreground">
-                  Total stock: {totalStock} strips across {batches.length} batch(es).
+                  Total stock: {totalStock} tablets across {batches.length} batch(es).
                 </p>
               </div>
               {batches.length > 0 ? (
@@ -165,14 +165,14 @@ export default function DrugStockCard({ drugGroup }: DrugStockCardProps) {
                       <li key={batch.id} className="text-sm border-b pb-2 last:border-b-0 last:pb-0">
                         <div className="font-semibold">Batch: {batch.batchNumber || 'N/A'}</div>
                         {batch.brandName && <div>Brand: {batch.brandName}</div>}
-                        <div>Stock: <Badge variant={batch.stock < batch.lowStockThreshold ? "destructive" : "secondary"}>{batch.stock}</Badge> strips</div>
+                        <div>Stock: <Badge variant={batch.stock < batch.lowStockThreshold ? "destructive" : "secondary"}>{batch.stock}</Badge> tablets</div>
                         <div className={cn(
                             batchExpiryStatus === 'expired' ? 'text-red-600' : batchExpiryStatus === 'soon' ? 'text-orange-600' : ''
                         )}>
                             Exp: {formatDateSafe(batch.dateOfExpiry, 'PP')} {batchDaysToExpiryText}
                         </div>
                         <div>Mfg: {formatDateSafe(batch.dateOfManufacture, 'PP')}</div>
-                        <div>Price/Strip: INR {batch.purchasePricePerStrip.toFixed(2)}</div>
+                        <div>Price/Tablet: INR {batch.purchasePricePerTablet.toFixed(2)}</div>
                       </li>
                     );
                   })}

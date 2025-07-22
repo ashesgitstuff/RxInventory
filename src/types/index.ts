@@ -7,8 +7,8 @@ export interface Drug {
   batchNumber?: string;
   dateOfManufacture?: string; // ISO string
   dateOfExpiry?: string; // ISO string
-  purchasePricePerStrip: number;
-  stock: number; // in strips for THIS SPECIFIC BATCH
+  purchasePricePerTablet: number;
+  stock: number; // in tablets for THIS SPECIFIC BATCH
   lowStockThreshold: number; // Individual threshold for THIS SPECIFIC BATCH
   initialSource?: string; // Source from where the drug batch was first added
 }
@@ -23,9 +23,9 @@ export const INITIAL_DRUGS: Drug[] = [
     batchNumber: 'M001',
     dateOfManufacture: '2023-01-01',
     dateOfExpiry: '2025-01-01',
-    purchasePricePerStrip: 5,
-    stock: 30,
-    lowStockThreshold: 10,
+    purchasePricePerTablet: 0.5,
+    stock: 300,
+    lowStockThreshold: 100,
     initialSource: 'System Setup'
   },
   {
@@ -36,9 +36,9 @@ export const INITIAL_DRUGS: Drug[] = [
     batchNumber: 'M002',
     dateOfManufacture: '2023-06-01',
     dateOfExpiry: '2025-06-01',
-    purchasePricePerStrip: 5.5,
-    stock: 20,
-    lowStockThreshold: 10,
+    purchasePricePerTablet: 0.55,
+    stock: 200,
+    lowStockThreshold: 100,
     initialSource: 'System Setup'
   },
    {
@@ -49,9 +49,9 @@ export const INITIAL_DRUGS: Drug[] = [
     batchNumber: 'MG003',
     dateOfManufacture: '2023-07-01',
     dateOfExpiry: '2024-07-01', // Earlier expiry for testing
-    purchasePricePerStrip: 4.5,
-    stock: 15,
-    lowStockThreshold: 5,
+    purchasePricePerTablet: 0.45,
+    stock: 150,
+    lowStockThreshold: 50,
     initialSource: 'System Setup'
   },
   {
@@ -62,19 +62,19 @@ export const INITIAL_DRUGS: Drug[] = [
     batchNumber: 'A002',
     dateOfManufacture: '2023-03-01',
     dateOfExpiry: '2025-03-01',
-    purchasePricePerStrip: 10,
-    stock: 50,
-    lowStockThreshold: 10,
+    purchasePricePerTablet: 1,
+    stock: 500,
+    lowStockThreshold: 100,
     initialSource: 'System Setup'
   },
 ];
 
-export const DEFAULT_PURCHASE_PRICE = 1;
-export const DEFAULT_DRUG_LOW_STOCK_THRESHOLD = 5;
+export const DEFAULT_PURCHASE_PRICE = 0.1;
+export const DEFAULT_DRUG_LOW_STOCK_THRESHOLD = 50;
 
 export interface DrugDispenseEntry {
   selectedBatchId: string; // ID of the specific batch to dispense from
-  stripsDispensed: number;
+  tabletsDispensed: number;
 }
 
 export interface DispenseFormData {
@@ -94,15 +94,15 @@ export interface NewDrugDetails {
   batchNumber: string; // Batch number is mandatory for a new batch
   dateOfManufacture?: string;
   dateOfExpiry: string; // Expiry date is mandatory for a new batch
-  purchasePricePerStrip: number;
+  purchasePricePerTablet: number;
   lowStockThreshold: number;
 }
 
 export interface DrugRestockEntry {
   drugId: string; // ID of existing batch to restock, or '--add-new--'
-  stripsAdded: number;
+  tabletsAdded: number;
   newDrugDetails?: NewDrugDetails; // Only if drugId is '--add-new--'
-  updatedPurchasePricePerStrip?: number; // For existing batch
+  updatedPurchasePricePerTablet?: number; // For existing batch
 }
 
 export interface RestockFormData {
@@ -165,7 +165,7 @@ export interface EditDrugFormData {
   batchNumber: string;
   dateOfManufacture?: string;
   dateOfExpiry: string;
-  purchasePricePerStrip: number;
+  purchasePricePerTablet: number;
   lowStockThreshold: number;
   initialSource?: string;
 }

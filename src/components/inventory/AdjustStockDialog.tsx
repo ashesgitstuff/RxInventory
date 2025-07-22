@@ -90,7 +90,7 @@ export default function AdjustStockDialog({ drug, isOpen, onClose, onSaveSuccess
               name="newStock"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>New Stock Quantity (in Strips)</FormLabel>
+                  <FormLabel>New Stock Quantity (in Tablets)</FormLabel>
                   <FormControl>
                     <Input type="number" placeholder="Enter new stock count" {...field} />
                   </FormControl>

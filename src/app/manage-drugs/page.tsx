@@ -134,8 +134,8 @@ export default function ManageDrugsPage() {
                     <TableHead>Mfg. Date</TableHead>
                     <TableHead>Exp. Date</TableHead>
                     <TableHead>Source</TableHead>
-                    <TableHead className="text-right">Stock (Strips)</TableHead>
-                    <TableHead className="text-right">Price/Strip (INR)</TableHead>
+                    <TableHead className="text-right">Stock (Tablets)</TableHead>
+                    <TableHead className="text-right">Price/Tablet (INR)</TableHead>
                     <TableHead className="text-right">Low Stock Threshold</TableHead>
                     <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
@@ -151,7 +151,7 @@ export default function ManageDrugsPage() {
                       <TableCell>{formatDateSafe(batch.dateOfExpiry)}</TableCell>
                       <TableCell>{batch.initialSource || 'N/A'}</TableCell>
                       <TableCell className="text-right">{batch.stock}</TableCell>
-                      <TableCell className="text-right">INR {batch.purchasePricePerStrip.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">INR {batch.purchasePricePerTablet.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{batch.lowStockThreshold}</TableCell>
                       <TableCell className="text-center space-x-1">
                         <Button variant="outline" size="sm" onClick={() => handleAdjustStock(batch)} className="h-8 px-2">

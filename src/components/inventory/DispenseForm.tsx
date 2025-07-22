@@ -25,7 +25,7 @@ import { Separator } from '@/components/ui/separator';
 
 const drugDispenseEntrySchema = z.object({
   selectedBatchId: z.string().min(1, { message: "Please select a drug batch." }),
-  stripsDispensed: z.coerce.number().int().positive({ message: "Strips must be a positive number." }),
+  tabletsDispensed: z.coerce.number().int().positive({ message: "Tablets must be a positive number." }),
 });
 
 const dispenseFormSchema = z.object({
@@ -54,7 +54,7 @@ export default function DispenseForm() {
       age: '' as unknown as number, 
       sex: undefined,
       villageName: '', 
-      drugsToDispense: [{ selectedBatchId: '', stripsDispensed: 1 }],
+      drugsToDispense: [{ selectedBatchId: '', tabletsDispensed: 1 }],
     },
   });
 
@@ -87,7 +87,7 @@ export default function DispenseForm() {
         age: '' as unknown as number,
         sex: undefined,
         villageName: '',
-        drugsToDispense: [{ selectedBatchId: '', stripsDispensed: 1 }],
+        drugsToDispense: [{ selectedBatchId: '', tabletsDispensed: 1 }],
       });
     } else {
       toast({
@@ -181,12 +181,12 @@ export default function DispenseForm() {
                   />
                   <FormField
                     control={form.control}
-                    name={`drugsToDispense.${index}.stripsDispensed`}
+                    name={`drugsToDispense.${index}.tabletsDispensed`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Number of Strips</FormLabel>
+                        <FormLabel>Number of Tablets</FormLabel>
                         <FormControl>
-                          <Input type="number" placeholder="Strips" {...field} min="1" />
+                          <Input type="number" placeholder="Tablets" {...field} min="1" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -200,7 +200,7 @@ export default function DispenseForm() {
                 )}
               </div>
             ))}
-            <Button type="button" variant="outline" onClick={() => append({ selectedBatchId: '', stripsDispensed: 1 })} className="w-full flex items-center gap-2">
+            <Button type="button" variant="outline" onClick={() => append({ selectedBatchId: '', tabletsDispensed: 1 })} className="w-full flex items-center gap-2">
               <PlusCircle className="h-4 w-4" /> Add Another Drug Batch
             </Button>
 

@@ -45,7 +45,7 @@ export default function TransactionsPage() {
             {detail.batchNumber && ` (Batch: ${detail.batchNumber})`}: 
             <span className={detail.quantity > 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
               {detail.quantity > 0 ? ` +${detail.quantity}` : ` ${detail.quantity}`}
-            </span> strips (Prev: {detail.previousStock}, New: {detail.newStock})
+            </span> tablets (Prev: {detail.previousStock}, New: {detail.newStock})
           </li>
         ))}
       </ul>
@@ -95,7 +95,7 @@ export default function TransactionsPage() {
     if (ud.newDateOfExpiry !== undefined && ud.newDateOfExpiry !== ud.previousDateOfExpiry) changes.push(`Exp. Date: ${formatDateSafe(ud.previousDateOfExpiry)} -> ${formatDateSafe(ud.newDateOfExpiry)}`);
     
     if (ud.newPrice !== undefined && ud.previousPrice !== undefined && ud.newPrice !== ud.previousPrice) changes.push(`Price: INR ${ud.previousPrice.toFixed(2)} -> INR ${ud.newPrice.toFixed(2)}`);
-    if (ud.newThreshold !== undefined && ud.previousThreshold !== undefined && ud.newThreshold !== ud.previousThreshold) changes.push(`Threshold: ${ud.previousThreshold} -> ${ud.newThreshold} strips`);
+    if (ud.newThreshold !== undefined && ud.previousThreshold !== undefined && ud.newThreshold !== ud.previousThreshold) changes.push(`Threshold: ${ud.previousThreshold} -> ${ud.newThreshold} tablets`);
     if (ud.newSource !== undefined && ud.newSource !== ud.previousSource) changes.push(`Source: "${ud.previousSource || 'N/A'}" -> "${ud.newSource || 'N/A'}"`);
 
     if (changes.length === 0 && !transaction.notes?.includes('details updated')) { 
