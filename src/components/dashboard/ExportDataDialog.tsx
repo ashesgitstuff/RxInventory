@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { format, parseISO, isValid, startOfDay, endOfDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -15,13 +15,14 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Calendar as CalendarIcon, Download } from 'lucide-react';
+import { Calendar as CalendarIcon, Download, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Drug, Transaction, TransactionDrugDetail } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -68,8 +69,16 @@ export default function ExportDataDialog({
 }: ExportDataDialogProps) {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
+  const [fileName, setFileName] = useState('');
   const { toast } = useToast();
   const { getDrugById } = useInventory();
+
+  useEffect(() => {
+    if (isOpen) {
+        const defaultFileName = `FORRADS_MMU_Export_${format(new Date(), 'yyyyMMdd_HHmmss')}`;
+        setFileName(defaultFileName);
+    }
+  }, [isOpen]);
 
   const handleExport = () => {
     if (!startDate || !endDate) {
@@ -88,6 +97,15 @@ export default function ExportDataDialog({
             description: "End date cannot be before start date.",
           });
           return;
+    }
+    
+    if (!fileName.trim()) {
+        toast({
+            variant: "destructive",
+            title: "Filename Required",
+            description: "Please enter a name for the export file.",
+        });
+        return;
     }
 
     toast({
@@ -229,16 +247,20 @@ export default function ExportDataDialog({
       XLSX.utils.book_append_sheet(wb, wsCurrentInventory, 'Current Inventory');
 
       // --- Trigger Download ---
-      const exportFileName = `FORRADS_MMU_Export_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`;
-      XLSX.writeFile(wb, exportFileName);
+      const finalFileName = fileName.trim().toLowerCase().endsWith('.xlsx') 
+        ? fileName.trim() 
+        : `${fileName.trim()}.xlsx`;
+        
+      XLSX.writeFile(wb, finalFileName);
 
       toast({
         title: "Export Successful",
-        description: `Data exported to ${exportFileName}`,
+        description: `Data exported to ${finalFileName}`,
       });
       onClose();
       setStartDate(undefined);
       setEndDate(undefined);
+      setFileName('');
 
     } catch (error) {
       console.error("Export failed:", error);
@@ -250,13 +272,20 @@ export default function ExportDataDialog({
     }
   };
 
+  const handleClose = () => {
+    onClose();
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setFileName('');
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); setStartDate(undefined); setEndDate(undefined); } }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { handleClose(); } }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Export Data to XLSX</DialogTitle>
           <DialogDescription>
-            Select a date range for the transaction logs. The "Current Inventory" sheet will always show the latest status regardless of the date range.
+            Select a date range for the logs and provide a filename. The "Current Inventory" sheet is always the latest status.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -321,6 +350,21 @@ export default function ExportDataDialog({
               </PopoverContent>
             </Popover>
           </div>
+           <div className="grid grid-cols-1 items-center gap-4">
+            <Label htmlFor="fileName" className="text-left">
+              File Name
+            </Label>
+             <div className="relative">
+                <FileText className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                    id="fileName"
+                    value={fileName}
+                    onChange={(e) => setFileName(e.target.value)}
+                    placeholder="Enter filename"
+                    className="pl-9"
+                />
+             </div>
+          </div>
         </div>
         <DialogFooter>
           <DialogClose asChild>
@@ -328,7 +372,7 @@ export default function ExportDataDialog({
               Cancel
             </Button>
           </DialogClose>
-          <Button type="button" onClick={handleExport} disabled={!startDate || !endDate}>
+          <Button type="button" onClick={handleExport} disabled={!startDate || !endDate || !fileName.trim()}>
             <Download className="mr-2 h-4 w-4" />
             Export to XLSX
           </Button>
@@ -337,5 +381,3 @@ export default function ExportDataDialog({
     </Dialog>
   );
 }
-
-    
