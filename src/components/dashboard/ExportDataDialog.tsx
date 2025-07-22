@@ -25,6 +25,8 @@ import { Calendar as CalendarIcon, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Drug, Transaction, TransactionDrugDetail } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useInventory } from '@/contexts/InventoryContext';
+
 
 interface ExportDataDialogProps {
   isOpen: boolean;
@@ -55,7 +57,7 @@ const formatDateOnlyForExcel = (dateString?: string) => {
     } catch (error) {
       return dateString;
     }
-  };
+};
 
 
 export default function ExportDataDialog({
@@ -67,13 +69,14 @@ export default function ExportDataDialog({
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
   const { toast } = useToast();
+  const { getDrugById } = useInventory();
 
   const handleExport = () => {
     if (!startDate || !endDate) {
       toast({
         variant: "destructive",
         title: "Date Range Required",
-        description: "Please select both a start and end date for the transaction log.",
+        description: "Please select both a start and end date for the data export.",
       });
       return;
     }
@@ -89,11 +92,10 @@ export default function ExportDataDialog({
 
     toast({
       title: "Exporting Data...",
-      description: "Preparing your XLSX file.",
+      description: "Preparing your multi-sheet XLSX file.",
     });
 
     try {
-      // 1. Filter Transactions
       const sDate = startOfDay(startDate);
       const eDate = endOfDay(endDate);
 
@@ -102,52 +104,105 @@ export default function ExportDataDialog({
         return isValid(txnDate) && txnDate >= sDate && txnDate <= eDate;
       });
 
-      // 2. Prepare Transaction Data for Sheet
-      const transactionSheetData = filteredTransactions.map(txn => {
-        let drugsInvolved = txn.drugs.map(d => 
-          `${d.drugName}${d.brandName ? ` [${d.brandName}]` : ''}${d.dosage ? ` (${d.dosage})` : ''}${d.batchNumber ? ` (Batch: ${d.batchNumber})` : ''}: ${d.quantity > 0 ? '+' : ''}${d.quantity} tablets (Prev: ${d.previousStock}, New: ${d.newStock})`
-        ).join('; ');
+      // --- Data Preparation for each sheet ---
 
-        let updateDetailsSummary = '';
-        if (txn.type === 'update' && txn.updateDetails) {
-            const ud = txn.updateDetails;
-            const changes = [];
-            if (ud.newName && ud.previousName !== undefined) changes.push(`Generic Name: "${ud.previousName}" -> "${ud.newName}"`);
-            if (ud.newBrandName !== undefined && ud.previousBrandName !== undefined) changes.push(`Brand Name: "${ud.previousBrandName || 'N/A'}" -> "${ud.newBrandName || 'N/A'}"`);
-            if (ud.newDosage !== undefined && ud.previousDosage !== undefined) changes.push(`Dosage: "${ud.previousDosage || 'N/A'}" -> "${ud.newDosage || 'N/A'}"`);
-            if (ud.newBatchNumber !== undefined && ud.previousBatchNumber !== undefined) changes.push(`Batch No: "${ud.previousBatchNumber || 'N/A'}" -> "${ud.newBatchNumber || 'N/A'}"`);
-            if (ud.newDateOfManufacture !== undefined && ud.previousDateOfManufacture !== undefined) changes.push(`Mfg. Date: ${formatDateOnlyForExcel(ud.previousDateOfManufacture)} -> ${formatDateOnlyForExcel(ud.newDateOfManufacture)}`);
-            if (ud.newDateOfExpiry !== undefined && ud.previousDateOfExpiry !== undefined) changes.push(`Exp. Date: ${formatDateOnlyForExcel(ud.previousDateOfExpiry)} -> ${formatDateOnlyForExcel(ud.newDateOfExpiry)}`);
-            if (ud.newPrice !== undefined && ud.previousPrice !== undefined) changes.push(`Price: ${ud.previousPrice.toFixed(2)} -> ${ud.newPrice.toFixed(2)}`);
-            if (ud.newThreshold !== undefined && ud.previousThreshold !== undefined) changes.push(`Threshold: ${ud.previousThreshold} -> ${ud.newThreshold}`);
-            if (ud.newSource !== undefined && ud.previousSource !== undefined) changes.push(`Source: "${ud.previousSource || 'N/A'}" -> "${ud.newSource || 'N/A'}"`);
-            updateDetailsSummary = changes.join('; ');
-            if (txn.notes && !txn.notes.startsWith('Details updated for batch:') && !txn.notes.startsWith('Purchase price updated for')) {
-                 updateDetailsSummary = updateDetailsSummary ? `${updateDetailsSummary}; Notes: ${txn.notes}` : `Notes: ${txn.notes}`;
-            } else if (txn.notes) {
-                updateDetailsSummary = txn.notes; // if specific note is about update itself
-            }
-        } else if (txn.notes) {
-            updateDetailsSummary = txn.notes;
+      // 1. Master Log
+      const masterLogData = filteredTransactions.flatMap(txn => {
+        if (txn.drugs.length === 0) {
+            // For transactions like 'update' that might not have drugs array populated
+            const drugDetails = txn.updateDetails ? getDrugById(txn.updateDetails.drugId) : null;
+            return [{
+                'Date': formatDateForExcel(txn.timestamp),
+                'Type': txn.type,
+                'Patient Name': txn.patientName || '',
+                'Aadhar': txn.aadharLastFour || '',
+                'Age/Sex': `${txn.age || ''} / ${txn.sex || ''}`,
+                'Village': txn.villageName || '',
+                'Drug Involved': drugDetails ? `${drugDetails.brandName || drugDetails.name}` : 'N/A',
+                'Dosage': drugDetails?.dosage || 'N/A',
+                'Batch Number': drugDetails?.batchNumber || 'N/A',
+                'Mfg. Date': drugDetails ? formatDateOnlyForExcel(drugDetails.dateOfManufacture) : 'N/A',
+                'Expiry Date': drugDetails ? formatDateOnlyForExcel(drugDetails.dateOfExpiry) : 'N/A',
+                'Source': txn.source || (drugDetails?.initialSource || ''),
+                'Notes': txn.notes || ''
+            }];
         }
-
-
-        return {
-          'Timestamp': formatDateForExcel(txn.timestamp),
-          'Type': txn.type,
-          'Patient Name': txn.patientName || '',
-          'Aadhar (Last 4)': txn.aadharLastFour || '',
-          'Age': txn.age || '',
-          'Sex': txn.sex || '',
-          'Village': txn.villageName || '',
-          'Drugs Involved/Stock Change': drugsInvolved,
-          'Source (for Restock)': txn.source || '',
-          'Notes/Update Details': updateDetailsSummary,
-        };
+        return txn.drugs.map(drugDetail => {
+            const drugBatch = getDrugById(drugDetail.drugId);
+            return {
+                'Date': formatDateForExcel(txn.timestamp),
+                'Type': txn.type,
+                'Patient Name': txn.patientName || '',
+                'Aadhar': txn.aadharLastFour || '',
+                'Age/Sex': `${txn.age || ''} / ${txn.sex || ''}`,
+                'Village': txn.villageName || '',
+                'Drug Involved': `${drugDetail.brandName || drugDetail.drugName}`,
+                'Dosage': drugDetail.dosage || '',
+                'Batch Number': drugDetail.batchNumber || '',
+                'Mfg. Date': drugBatch ? formatDateOnlyForExcel(drugBatch.dateOfManufacture) : '',
+                'Expiry Date': drugBatch ? formatDateOnlyForExcel(drugBatch.dateOfExpiry) : '',
+                'Source': txn.source || (drugBatch?.initialSource || ''),
+                'Notes': txn.notes || `Qty: ${drugDetail.quantity}, Stock: ${drugDetail.previousStock} -> ${drugDetail.newStock}`
+            };
+        });
       });
 
-      // 3. Prepare Inventory Data for Sheet
-      const inventorySheetData = allDrugs.map(drug => ({
+      // 2. Patient Dispensing
+      const patientDispensingData = filteredTransactions
+        .filter(txn => txn.type === 'dispense')
+        .flatMap(txn => txn.drugs.map(drugDetail => {
+            const drugBatch = getDrugById(drugDetail.drugId);
+            return {
+                'Date': formatDateForExcel(txn.timestamp),
+                'Patient Name': txn.patientName || '',
+                'Age/Sex': `${txn.age || ''} / ${txn.sex || ''}`,
+                'Aadhar': txn.aadharLastFour || '',
+                'Village': txn.villageName || '',
+                'Drug Involved': `${drugDetail.brandName || drugDetail.drugName}`,
+                'Dosage': drugDetail.dosage || '',
+                'Batch and Expiry': `Batch: ${drugDetail.batchNumber || 'N/A'}, Exp: ${drugBatch ? formatDateOnlyForExcel(drugBatch.dateOfExpiry) : 'N/A'}`,
+                'Quantity Dispensed': -drugDetail.quantity
+            };
+        }));
+      
+      // 3. Drug Inventory Log
+      const drugInventoryLogData = filteredTransactions
+        .filter(txn => ['restock', 'update', 'adjustment'].includes(txn.type))
+        .flatMap(txn => {
+            if (txn.drugs.length === 0 && txn.updateDetails) { // Handle pure updates
+                const drugBatch = getDrugById(txn.updateDetails.drugId);
+                return [{
+                    'Date': formatDateForExcel(txn.timestamp),
+                    'Source': txn.source || drugBatch?.initialSource || '',
+                    'Type': txn.type,
+                    'Drug': drugBatch ? `${drugBatch.brandName || drugBatch.name}` : (txn.updateDetails.drugName || ''),
+                    'Dose': drugBatch?.dosage || '',
+                    'Batch': drugBatch?.batchNumber || '',
+                    'Mfg. Date': drugBatch ? formatDateOnlyForExcel(drugBatch.dateOfManufacture) : '',
+                    'Exp. Date': drugBatch ? formatDateOnlyForExcel(drugBatch.dateOfExpiry) : '',
+                    'Stock After Change': drugBatch?.stock ?? 'N/A',
+                    'Notes': txn.notes
+                }];
+            }
+            return txn.drugs.map(drugDetail => {
+                const drugBatch = getDrugById(drugDetail.drugId);
+                return {
+                    'Date': formatDateForExcel(txn.timestamp),
+                    'Source': txn.source || drugBatch?.initialSource || '',
+                    'Type': txn.type,
+                    'Drug': `${drugDetail.brandName || drugDetail.drugName}`,
+                    'Dose': drugDetail.dosage || '',
+                    'Batch': drugDetail.batchNumber || '',
+                    'Mfg. Date': drugBatch ? formatDateOnlyForExcel(drugBatch.dateOfManufacture) : '',
+                    'Exp. Date': drugBatch ? formatDateOnlyForExcel(drugBatch.dateOfExpiry) : '',
+                    'Stock After Change': drugDetail.newStock,
+                    'Notes': txn.notes || `Qty changed by ${drugDetail.quantity}`
+                };
+            });
+      });
+
+      // 4. Current Inventory
+      const currentInventoryData = allDrugs.map(drug => ({
         'Generic Name': drug.name,
         'Brand Name': drug.brandName || '',
         'Dosage': drug.dosage || '',
@@ -160,15 +215,20 @@ export default function ExportDataDialog({
         'Initial Source': drug.initialSource || '',
       }));
 
-      // 4. Create Workbook and Sheets
+
+      // --- Create Workbook and Sheets ---
       const wb = XLSX.utils.book_new();
-      const wsTransactions = XLSX.utils.json_to_sheet(transactionSheetData);
-      const wsInventory = XLSX.utils.json_to_sheet(inventorySheetData);
+      const wsMaster = XLSX.utils.json_to_sheet(masterLogData);
+      const wsDispensing = XLSX.utils.json_to_sheet(patientDispensingData);
+      const wsInventoryLog = XLSX.utils.json_to_sheet(drugInventoryLogData);
+      const wsCurrentInventory = XLSX.utils.json_to_sheet(currentInventoryData);
+      
+      XLSX.utils.book_append_sheet(wb, wsMaster, 'Master Log');
+      XLSX.utils.book_append_sheet(wb, wsDispensing, 'Patient Dispensing');
+      XLSX.utils.book_append_sheet(wb, wsInventoryLog, 'Drug Inventory Log');
+      XLSX.utils.book_append_sheet(wb, wsCurrentInventory, 'Current Inventory');
 
-      XLSX.utils.book_append_sheet(wb, wsTransactions, 'Transaction Log');
-      XLSX.utils.book_append_sheet(wb, wsInventory, 'Current Inventory');
-
-      // 5. Trigger Download
+      // --- Trigger Download ---
       const exportFileName = `FORRADS_MMU_Export_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`;
       XLSX.writeFile(wb, exportFileName);
 
@@ -196,7 +256,7 @@ export default function ExportDataDialog({
         <DialogHeader>
           <DialogTitle>Export Data to XLSX</DialogTitle>
           <DialogDescription>
-            Select a date range for the transaction log. The current inventory will also be exported.
+            Select a date range for the transaction logs. The "Current Inventory" sheet will always show the latest status regardless of the date range.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -277,3 +337,5 @@ export default function ExportDataDialog({
     </Dialog>
   );
 }
+
+    
