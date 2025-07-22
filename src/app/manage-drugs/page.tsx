@@ -151,7 +151,7 @@ export default function ManageDrugsPage() {
                       <TableCell>{formatDateSafe(batch.dateOfExpiry)}</TableCell>
                       <TableCell>{batch.initialSource || 'N/A'}</TableCell>
                       <TableCell className="text-right">{batch.stock}</TableCell>
-                      <TableCell className="text-right">INR {batch.purchasePricePerTablet.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">INR {(batch.purchasePricePerTablet ?? 0).toFixed(2)}</TableCell>
                       <TableCell className="text-right">{batch.lowStockThreshold}</TableCell>
                       <TableCell className="text-center space-x-1">
                         <Button variant="outline" size="sm" onClick={() => handleAdjustStock(batch)} className="h-8 px-2">
