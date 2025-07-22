@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
-import { ListChecks, ArrowDownCircle, ArrowUpCircle, Edit3, MapPin } from 'lucide-react';
+import { ListChecks, ArrowDownCircle, ArrowUpCircle, Edit3, MapPin, Replace } from 'lucide-react';
 import type { Transaction, TransactionDrugDetail } from '@/types';
 
 const formatDateSafe = (dateString?: string) => {
@@ -51,6 +51,27 @@ export default function TransactionsPage() {
       </ul>
     );
   };
+  
+  const renderAdjustmentDetails = (transaction: Transaction) => {
+    if (transaction.type !== 'adjustment' || !transaction.drugs.length) return null;
+    const detail = transaction.drugs[0];
+    const change = detail.newStock - detail.previousStock;
+
+    return (
+      <div className="text-sm">
+        <p>
+            {detail.drugName} {detail.dosage ? `(${detail.dosage})` : ''} {detail.brandName ? `[${detail.brandName}]` : ''}
+            {detail.batchNumber && ` (Batch: ${detail.batchNumber})`}
+        </p>
+        <p className="font-semibold">
+          Stock changed from {detail.previousStock} to {detail.newStock} 
+          <span className={change > 0 ? "text-green-600" : "text-red-600"}> ({change > 0 ? `+${change}`: change})</span>.
+        </p>
+        {transaction.notes && <p className="italic text-muted-foreground">Reason: {transaction.notes}</p>}
+      </div>
+    );
+  }
+
 
   const renderUpdateDetails = (transaction: Transaction) => {
     if (transaction.type !== 'update' || !transaction.updateDetails) return null;
@@ -121,12 +142,15 @@ export default function TransactionsPage() {
                       <TableCell>{format(new Date(transaction.timestamp), "PPpp")}</TableCell>
                       <TableCell>
                         <Badge 
-                          variant={transaction.type === 'dispense' ? 'destructive' : transaction.type === 'update' ? 'secondary' : 'default'} 
-                          className="capitalize flex items-center gap-1"
+                           variant={transaction.type === 'dispense' ? 'destructive' : 
+                           transaction.type === 'adjustment' ? 'secondary' : 
+                           transaction.type === 'update' ? 'secondary' : 'default'}
+                           className="capitalize flex items-center gap-1"
                         >
                           {transaction.type === 'dispense' && <ArrowDownCircle className="h-3 w-3" />}
                           {transaction.type === 'restock' && <ArrowUpCircle className="h-3 w-3" />}
                           {transaction.type === 'update' && <Edit3 className="h-3 w-3" />}
+                          {transaction.type === 'adjustment' && <Replace className="h-3 w-3" />}
                           {transaction.type}
                         </Badge>
                       </TableCell>
@@ -146,9 +170,14 @@ export default function TransactionsPage() {
                          {transaction.type === 'update' && (
                             transaction.notes && !transaction.notes.startsWith('Details updated for batch:') && !transaction.notes.startsWith('Purchase price updated for') ? <p className="text-sm italic">{transaction.notes}</p> : <span className="text-sm text-muted-foreground">Batch details changed</span>
                         )}
+                         {transaction.type === 'adjustment' && (
+                            <p className="text-sm"><strong>By:</strong> {transaction.source || 'Admin'}</p>
+                         )}
                       </TableCell>
                       <TableCell>
-                        {transaction.type === 'update' ? renderUpdateDetails(transaction) : renderDrugDetails(transaction.drugs)}
+                        {transaction.type === 'update' ? renderUpdateDetails(transaction) :
+                         transaction.type === 'adjustment' ? renderAdjustmentDetails(transaction) :
+                         renderDrugDetails(transaction.drugs)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -161,4 +190,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-

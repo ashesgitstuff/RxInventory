@@ -14,8 +14,9 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import { Edit, Pill, Info, Trash2, AlertTriangle } from 'lucide-react';
+import { Edit, Pill, Info, Trash2, AlertTriangle, Replace } from 'lucide-react';
 import EditDrugForm from '@/components/inventory/EditDrugForm';
+import AdjustStockDialog from '@/components/inventory/AdjustStockDialog';
 import {
   Dialog,
   DialogContent,
@@ -50,6 +51,7 @@ export default function ManageDrugsPage() {
   const [selectedDrugBatch, setSelectedDrugBatch] = useState<Drug | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isAdjustStockDialogOpen, setIsAdjustStockDialogOpen] = useState(false);
   const [drugToDelete, setDrugToDelete] = useState<Drug | null>(null);
   const { toast } = useToast();
 
@@ -57,9 +59,15 @@ export default function ManageDrugsPage() {
     setSelectedDrugBatch(drugBatch);
     setIsEditDialogOpen(true);
   };
+  
+  const handleAdjustStock = (drugBatch: Drug) => {
+    setSelectedDrugBatch(drugBatch);
+    setIsAdjustStockDialogOpen(true);
+  };
 
   const handleSaveSuccess = () => {
     setIsEditDialogOpen(false);
+    setIsAdjustStockDialogOpen(false);
     setSelectedDrugBatch(null);
   };
 
@@ -145,12 +153,15 @@ export default function ManageDrugsPage() {
                       <TableCell className="text-right">{batch.stock}</TableCell>
                       <TableCell className="text-right">INR {batch.purchasePricePerStrip.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{batch.lowStockThreshold}</TableCell>
-                      <TableCell className="text-center space-x-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(batch)}>
-                          <Edit className="mr-2 h-4 w-4" /> Edit
+                      <TableCell className="text-center space-x-1">
+                        <Button variant="outline" size="sm" onClick={() => handleAdjustStock(batch)} className="h-8 px-2">
+                          <Replace className="mr-1 h-4 w-4" /> Adjust Stock
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(batch)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(batch)} className="h-8 px-2">
+                          <Edit className="mr-1 h-4 w-4" /> Edit
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => openDeleteDialog(batch)} className="h-8 px-2">
+                          <Trash2 className="mr-1 h-4 w-4" /> Delete
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -162,7 +173,7 @@ export default function ManageDrugsPage() {
         </CardContent>
       </Card>
 
-      {selectedDrugBatch && (
+      {selectedDrugBatch && isEditDialogOpen && (
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl">
             <DialogHeader>
@@ -182,6 +193,15 @@ export default function ManageDrugsPage() {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {selectedDrugBatch && isAdjustStockDialogOpen && (
+        <AdjustStockDialog
+          drug={selectedDrugBatch}
+          isOpen={isAdjustStockDialogOpen}
+          onClose={() => setIsAdjustStockDialogOpen(false)}
+          onSaveSuccess={handleSaveSuccess}
+        />
       )}
 
       {drugToDelete && (
@@ -210,4 +230,3 @@ export default function ManageDrugsPage() {
     </div>
   );
 }
-

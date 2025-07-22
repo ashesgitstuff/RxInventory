@@ -33,6 +33,7 @@ interface InventoryContextType {
   dispenseDrugs: (patientDetails: Omit<DispenseFormData, 'drugsToDispense'>, drugsToDispense: Array<DrugDispenseEntry>) => Promise<{ success: boolean; message?: string; dispensedDrugsInfo: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }> }>;
   restockDrugs: (source: string, drugsToRestock: Array<DrugRestockEntry>) => Promise<{ success: boolean; message?: string; restockedDrugs: Array<{ drugName: string; brandName?: string; dosage?: string; batchNumber?: string; quantity: number }> }>;
   updateDrugDetails: (drugId: string, data: EditDrugFormData) => Promise<{ success: boolean; message?: string; updatedDrug?: Drug }>;
+  adjustDrugStock: (drugId: string, newStock: number, reason: string) => Promise<{ success: boolean; message?: string }>;
   deleteDrugBatch: (drugId: string) => Promise<{ success: boolean; message?: string; deletedDrugName?: string }>;
   getDrugById: (drugId: string) => Drug | undefined;
   getDrugGroupsForDisplay: () => GroupedDrugDisplay[];
@@ -451,6 +452,39 @@ const dispenseDrugs = async (
     return { success: true, message: 'Drug details updated successfully.', updatedDrug: updatedDrug };
   };
 
+  const adjustDrugStock = async (drugId: string, newStock: number, reason: string): Promise<{ success: boolean; message?: string }> => {
+    const drugIndex = drugs.findIndex(d => d.id === drugId);
+    if (drugIndex === -1) {
+        return { success: false, message: 'Drug batch not found.' };
+    }
+
+    const tempDrugs = [...drugs];
+    const drugToUpdate = { ...tempDrugs[drugIndex] };
+    const previousStock = drugToUpdate.stock;
+
+    drugToUpdate.stock = newStock;
+    tempDrugs[drugIndex] = drugToUpdate;
+    setDrugs(tempDrugs);
+
+    addTransaction({
+        type: 'adjustment',
+        source: 'Admin', // Or could be a user name if auth was implemented
+        drugs: [{
+            drugId: drugToUpdate.id,
+            drugName: drugToUpdate.name,
+            brandName: drugToUpdate.brandName,
+            dosage: drugToUpdate.dosage,
+            batchNumber: drugToUpdate.batchNumber,
+            quantity: newStock - previousStock, // This captures the change
+            previousStock: previousStock,
+            newStock: newStock,
+        }],
+        notes: reason,
+    });
+    
+    return { success: true, message: `Stock for ${drugToUpdate.name} (Batch: ${drugToUpdate.batchNumber}) adjusted successfully.`};
+  };
+
   const deleteDrugBatch = async (drugId: string): Promise<{ success: boolean; message?: string; deletedDrugName?: string }> => {
     const drugToDelete = drugs.find(d => d.id === drugId);
     if (!drugToDelete) {
@@ -503,6 +537,7 @@ const dispenseDrugs = async (
         dispenseDrugs, 
         restockDrugs, 
         updateDrugDetails,
+        adjustDrugStock,
         deleteDrugBatch,
         getDrugById,
         getDrugGroupsForDisplay,

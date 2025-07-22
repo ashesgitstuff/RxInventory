@@ -123,7 +123,7 @@ export interface TransactionDrugDetail {
 
 export interface Transaction {
   id: string;
-  type: 'dispense' | 'restock' | 'update';
+  type: 'dispense' | 'restock' | 'update' | 'adjustment';
   timestamp: string;
   patientName?: string;
   aadharLastFour?: string;
